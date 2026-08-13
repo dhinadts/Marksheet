@@ -1,0 +1,5 @@
+node_modules
+.next
+.git-generated
+npm-debug.log*
+

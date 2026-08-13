@@ -1,0 +1,18 @@
+{
+  "name": "ai-marks",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace frontend && npm run build --workspace backend",
+    "lint": "npm run lint --workspace frontend && npm run lint --workspace backend",
+    "test": "npm run test --workspace backend -- --runInBand",
+    "typecheck": "npm exec --workspace frontend -- tsc --noEmit && npm exec --workspace backend -- tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

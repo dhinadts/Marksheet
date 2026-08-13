@@ -1,0 +1,33 @@
+# Dependencies and build output
+node_modules/
+**/node_modules/
+**/.next/
+**/dist/
+**/coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+
+# Flutter/Dart
+**/.dart_tool/
+**/build/
+**/.flutter-plugins*
+
+# IDE and operating system
+.idea/
+.vscode/
+.git-generated/
+.DS_Store
+Thumbs.db
+
+# Local infrastructure data
+.data/
