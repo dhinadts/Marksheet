@@ -1,4 +1,4 @@
 # Database documentation
 
-The ER model and integrity rules are Phase 2 deliverables.
-
+See `docs/database/database-design.md` for the ER model, tenancy boundaries, versioning,
+integrity rules, and Phase 3 RLS activation contract.

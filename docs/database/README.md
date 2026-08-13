@@ -1,4 +1,6 @@
-# Database design
+# Database documentation
 
-The detailed PostgreSQL and Prisma design is a Phase 2 deliverable. It will use UUID identifiers, tenant ownership, individually stored mark values, immutable history, and row-level-security compatibility.
-
+The Phase 2 PostgreSQL/Prisma design is documented in
+[database-design.md](database-design.md). The executable source of truth is
+`backend/prisma/schema.prisma`, supplemented by PostgreSQL constraints and triggers in
+the initial migration.

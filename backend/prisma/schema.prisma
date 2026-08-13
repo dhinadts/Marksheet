@@ -1,0 +1,957 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum VersionStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum MarkSheetStatus {
+  UPLOADED
+  PROCESSING
+  REVIEW_REQUIRED
+  VERIFIED
+  COMPLETED
+  FAILED
+}
+
+enum ExtractionStatus {
+  PENDING
+  AUTO_ACCEPT
+  REVIEW_RECOMMENDED
+  REVIEW_REQUIRED
+  MANUAL_ENTRY_REQUIRED
+  INVALID_EXTRACTION
+}
+
+enum VerificationStatus {
+  PENDING
+  IN_REVIEW
+  CORRECTED
+  VERIFIED
+  REJECTED
+}
+
+enum MarkValueSource {
+  AI
+  REVIEWER
+  DATA_ENTRY
+  CALCULATION
+  IMPORT
+}
+
+enum VerificationSessionStatus {
+  OPEN
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum CalculationStatus {
+  COMPLETE
+  INCOMPLETE
+  TOTAL_MISMATCH
+  INVALID
+  READY_FOR_EXPORT
+}
+
+enum JobType {
+  QUALITY_CHECK
+  PREPROCESS
+  TEMPLATE_DETECTION
+  CELL_DETECTION
+  MARK_EXTRACTION
+  VALIDATION
+  FULL_PROCESSING
+  EXPORT
+}
+
+enum JobStatus {
+  PENDING
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum FilePurpose {
+  ORIGINAL_MARK_SHEET
+  PROCESSED_MARK_SHEET
+  QUESTION_CROP
+  EXPORT
+  MODEL_ARTIFACT
+}
+
+enum ExportFormat {
+  CSV
+  XLSX
+  PDF
+  JSON
+}
+
+enum ExportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+model Tenant {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  code                  String                 @unique @db.VarChar(50)
+  name                  String                 @db.VarChar(200)
+  status                RecordStatus           @default(ACTIVE)
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  users                 User[]
+  roles                 Role[]
+  universities          University[]
+  colleges              College[]
+  departments           Department[]
+  programs              Program[]
+  academicYears         AcademicYear[]
+  studyYears            StudyYear[]
+  semesters             Semester[]
+  classes               AcademicClass[]
+  sections              Section[]
+  students              Student[]
+  subjects              Subject[]
+  subjectOfferings      SubjectOffering[]
+  questionPapers        QuestionPaper[]
+  questionPaperVersions QuestionPaperVersion[]
+  questions             Question[]
+  questionParts         QuestionPart[]
+  markingSchemes        MarkingScheme[]
+  markingSchemeVersions MarkingSchemeVersion[]
+  markingSchemeItems    MarkingSchemeItem[]
+  markSheets            MarkSheet[]
+  markSheetImages       MarkSheetImage[]
+  extractedMarks        ExtractedMark[]
+  markValues            MarkValue[]
+  verificationSessions  VerificationSession[]
+  verificationItems     VerificationItem[]
+  calculationResults    CalculationResult[]
+  auditLogs             AuditLog[]
+  processingJobs        ProcessingJob[]
+  aiModelVersions       AiModelVersion[]
+  fileObjects           FileObject[]
+  exports               Export[]
+  notifications         Notification[]
+  authSessions          AuthSession[]
+  userRoles             UserRole[]
+  rolePermissions       RolePermission[]
+
+  @@map("tenants")
+}
+
+model User {
+  id                             String                 @id @default(uuid()) @db.Uuid
+  tenantId                       String                 @map("tenant_id") @db.Uuid
+  email                          String                 @db.VarChar(320)
+  passwordHash                   String?                @map("password_hash") @db.VarChar(255)
+  displayName                    String                 @map("display_name") @db.VarChar(150)
+  status                         RecordStatus           @default(ACTIVE)
+  failedLoginAttempts            Int                    @default(0) @map("failed_login_attempts")
+  lockedUntil                    DateTime?              @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt                    DateTime?              @map("last_login_at") @db.Timestamptz(6)
+  tokenVersion                   Int                    @default(0) @map("token_version")
+  createdAt                      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant                         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  userRoles                      UserRole[]
+  createdQuestionPaperVersions   QuestionPaperVersion[] @relation("QuestionPaperVersionCreatedBy")
+  publishedQuestionPaperVersions QuestionPaperVersion[] @relation("QuestionPaperVersionPublishedBy")
+  createdSchemeVersions          MarkingSchemeVersion[] @relation("SchemeVersionCreatedBy")
+  publishedSchemeVersions        MarkingSchemeVersion[] @relation("SchemeVersionPublishedBy")
+  markValues                     MarkValue[]
+  verificationSessions           VerificationSession[]  @relation("VerificationAssignedTo")
+  completedVerificationSessions  VerificationSession[]  @relation("VerificationCompletedBy")
+  auditLogs                      AuditLog[]
+  requestedExports               Export[]
+  notifications                  Notification[]
+  authSessions                   AuthSession[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@map("users")
+}
+
+model AuthSession {
+  id               String        @id @default(uuid()) @db.Uuid
+  tenantId         String        @map("tenant_id") @db.Uuid
+  userId           String        @map("user_id") @db.Uuid
+  familyId         String        @map("family_id") @db.Uuid
+  tokenHash        String        @unique @map("token_hash") @db.Char(64)
+  parentSessionId  String?       @map("parent_session_id") @db.Uuid
+  replacedById     String?       @unique @map("replaced_by_id") @db.Uuid
+  expiresAt        DateTime      @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime?     @map("revoked_at") @db.Timestamptz(6)
+  revocationReason String?       @map("revocation_reason") @db.VarChar(120)
+  ipAddress        String?       @map("ip_address") @db.Inet
+  userAgent        String?       @map("user_agent") @db.VarChar(500)
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt       DateTime?     @map("last_used_at") @db.Timestamptz(6)
+  tenant           Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentSession    AuthSession?  @relation("AuthSessionRotation", fields: [parentSessionId], references: [id], onDelete: SetNull)
+  childSessions    AuthSession[] @relation("AuthSessionRotation")
+  replacedBy       AuthSession?  @relation("AuthSessionReplacement", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces         AuthSession?  @relation("AuthSessionReplacement")
+
+  @@index([tenantId, userId, expiresAt])
+  @@index([tenantId, familyId])
+  @@map("auth_sessions")
+}
+
+model Role {
+  id              String           @id @default(uuid()) @db.Uuid
+  tenantId        String           @map("tenant_id") @db.Uuid
+  code            String           @db.VarChar(80)
+  name            String           @db.VarChar(120)
+  description     String?
+  isSystem        Boolean          @default(false) @map("is_system")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, code])
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(uuid()) @db.Uuid
+  code            String           @unique @db.VarChar(120)
+  description     String?
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, roleId])
+  @@index([tenantId, userId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model University {
+  id        String       @id @default(uuid()) @db.Uuid
+  tenantId  String       @map("tenant_id") @db.Uuid
+  code      String       @db.VarChar(50)
+  name      String       @db.VarChar(200)
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  colleges  College[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@map("universities")
+}
+
+model College {
+  id           String       @id @default(uuid()) @db.Uuid
+  tenantId     String       @map("tenant_id") @db.Uuid
+  universityId String       @map("university_id") @db.Uuid
+  code         String       @db.VarChar(50)
+  name         String       @db.VarChar(200)
+  status       RecordStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  university   University   @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  departments  Department[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, universityId])
+  @@map("colleges")
+}
+
+model Department {
+  id        String       @id @default(uuid()) @db.Uuid
+  tenantId  String       @map("tenant_id") @db.Uuid
+  collegeId String       @map("college_id") @db.Uuid
+  code      String       @db.VarChar(50)
+  name      String       @db.VarChar(200)
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  college   College      @relation(fields: [collegeId], references: [id], onDelete: Restrict)
+  programs  Program[]
+  students  Student[]
+  subjects  Subject[]
+
+  @@unique([tenantId, collegeId, code])
+  @@index([tenantId, collegeId])
+  @@map("departments")
+}
+
+model Program {
+  id               String            @id @default(uuid()) @db.Uuid
+  tenantId         String            @map("tenant_id") @db.Uuid
+  departmentId     String            @map("department_id") @db.Uuid
+  code             String            @db.VarChar(50)
+  name             String            @db.VarChar(200)
+  status           RecordStatus      @default(ACTIVE)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  department       Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  classes          AcademicClass[]
+  students         Student[]
+  subjectOfferings SubjectOffering[]
+
+  @@unique([tenantId, departmentId, code])
+  @@index([tenantId, departmentId])
+  @@map("programs")
+}
+
+model AcademicYear {
+  id               String            @id @default(uuid()) @db.Uuid
+  tenantId         String            @map("tenant_id") @db.Uuid
+  code             String            @db.VarChar(30)
+  startsOn         DateTime          @map("starts_on") @db.Date
+  endsOn           DateTime          @map("ends_on") @db.Date
+  status           RecordStatus      @default(ACTIVE)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  semesters        Semester[]
+  classes          AcademicClass[]
+  subjectOfferings SubjectOffering[]
+
+  @@unique([tenantId, code])
+  @@map("academic_years")
+}
+
+model StudyYear {
+  id          String          @id @default(uuid()) @db.Uuid
+  tenantId    String          @map("tenant_id") @db.Uuid
+  ordinal     Int
+  displayName String          @map("display_name") @db.VarChar(50)
+  status      RecordStatus    @default(ACTIVE)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  classes     AcademicClass[]
+
+  @@unique([tenantId, ordinal])
+  @@map("study_years")
+}
+
+model Semester {
+  id               String            @id @default(uuid()) @db.Uuid
+  tenantId         String            @map("tenant_id") @db.Uuid
+  academicYearId   String            @map("academic_year_id") @db.Uuid
+  ordinal          Int
+  displayName      String            @map("display_name") @db.VarChar(50)
+  status           RecordStatus      @default(ACTIVE)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYear     AcademicYear      @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  classes          AcademicClass[]
+  subjectOfferings SubjectOffering[]
+
+  @@unique([tenantId, academicYearId, ordinal])
+  @@map("semesters")
+}
+
+model AcademicClass {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  programId      String       @map("program_id") @db.Uuid
+  academicYearId String       @map("academic_year_id") @db.Uuid
+  studyYearId    String       @map("study_year_id") @db.Uuid
+  semesterId     String       @map("semester_id") @db.Uuid
+  code           String       @db.VarChar(50)
+  name           String       @db.VarChar(120)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Restrict)
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  studyYear      StudyYear    @relation(fields: [studyYearId], references: [id], onDelete: Restrict)
+  semester       Semester     @relation(fields: [semesterId], references: [id], onDelete: Restrict)
+  sections       Section[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, programId, academicYearId])
+  @@map("classes")
+}
+
+model Section {
+  id               String            @id @default(uuid()) @db.Uuid
+  tenantId         String            @map("tenant_id") @db.Uuid
+  classId          String            @map("class_id") @db.Uuid
+  code             String            @db.VarChar(20)
+  name             String            @db.VarChar(80)
+  status           RecordStatus      @default(ACTIVE)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  class            AcademicClass     @relation(fields: [classId], references: [id], onDelete: Restrict)
+  students         Student[]
+  subjectOfferings SubjectOffering[]
+
+  @@unique([tenantId, classId, code])
+  @@map("sections")
+}
+
+model Student {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  departmentId   String       @map("department_id") @db.Uuid
+  programId      String       @map("program_id") @db.Uuid
+  sectionId      String       @map("section_id") @db.Uuid
+  registerNumber String       @map("register_number") @db.VarChar(80)
+  fullName       String       @map("full_name") @db.VarChar(200)
+  email          String?      @db.VarChar(320)
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  department     Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Restrict)
+  section        Section      @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  markSheets     MarkSheet[]
+
+  @@unique([tenantId, registerNumber])
+  @@index([tenantId, sectionId, status])
+  @@map("students")
+}
+
+model Subject {
+  id             String            @id @default(uuid()) @db.Uuid
+  tenantId       String            @map("tenant_id") @db.Uuid
+  departmentId   String            @map("department_id") @db.Uuid
+  code           String            @db.VarChar(50)
+  name           String            @db.VarChar(200)
+  status         RecordStatus      @default(ACTIVE)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  department     Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  offerings      SubjectOffering[]
+  questionPapers QuestionPaper[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, departmentId])
+  @@map("subjects")
+}
+
+model SubjectOffering {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  subjectId      String       @map("subject_id") @db.Uuid
+  programId      String       @map("program_id") @db.Uuid
+  academicYearId String       @map("academic_year_id") @db.Uuid
+  semesterId     String       @map("semester_id") @db.Uuid
+  sectionId      String       @map("section_id") @db.Uuid
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  subject        Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Restrict)
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  semester       Semester     @relation(fields: [semesterId], references: [id], onDelete: Restrict)
+  section        Section      @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  markSheets     MarkSheet[]
+
+  @@unique([tenantId, subjectId, academicYearId, sectionId])
+  @@index([tenantId, sectionId])
+  @@map("subject_offerings")
+}
+
+model QuestionPaper {
+  id             String                 @id @default(uuid()) @db.Uuid
+  tenantId       String                 @map("tenant_id") @db.Uuid
+  subjectId      String                 @map("subject_id") @db.Uuid
+  code           String                 @db.VarChar(80)
+  title          String                 @db.VarChar(250)
+  status         RecordStatus           @default(ACTIVE)
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  subject        Subject                @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  versions       QuestionPaperVersion[]
+  markingSchemes MarkingScheme[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, subjectId])
+  @@map("question_papers")
+}
+
+model QuestionPaperVersion {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  tenantId               String                 @map("tenant_id") @db.Uuid
+  questionPaperId        String                 @map("question_paper_id") @db.Uuid
+  version                Int
+  status                 VersionStatus          @default(DRAFT)
+  instructions           String?
+  publishedAt            DateTime?              @map("published_at") @db.Timestamptz(6)
+  createdById            String?                @map("created_by_id") @db.Uuid
+  publishedById          String?                @map("published_by_id") @db.Uuid
+  markingSchemeVersionId String?                @unique @map("marking_scheme_version_id") @db.Uuid
+  createdAt              DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  questionPaper          QuestionPaper          @relation(fields: [questionPaperId], references: [id], onDelete: Restrict)
+  createdBy              User?                  @relation("QuestionPaperVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  publishedBy            User?                  @relation("QuestionPaperVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  markingSchemeVersion   MarkingSchemeVersion?  @relation("SelectedMarkingScheme", fields: [markingSchemeVersionId], references: [id], onDelete: Restrict)
+  authoredSchemes        MarkingSchemeVersion[] @relation("SchemeSourcePaperVersion")
+  questions              Question[]
+  markSheets             MarkSheet[]
+
+  @@unique([tenantId, questionPaperId, version])
+  @@index([tenantId, status])
+  @@map("question_paper_versions")
+}
+
+model Question {
+  id                     String               @id @default(uuid()) @db.Uuid
+  tenantId               String               @map("tenant_id") @db.Uuid
+  questionPaperVersionId String               @map("question_paper_version_id") @db.Uuid
+  code                   String               @db.VarChar(50)
+  label                  String               @db.VarChar(80)
+  groupCode              String               @map("group_code") @db.VarChar(50)
+  displayOrder           Int                  @map("display_order")
+  isRequired             Boolean              @default(true) @map("is_required")
+  createdAt              DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  questionPaperVersion   QuestionPaperVersion @relation(fields: [questionPaperVersionId], references: [id], onDelete: Cascade)
+  parts                  QuestionPart[]
+  schemeItems            MarkingSchemeItem[]
+  extractedMarks         ExtractedMark[]
+
+  @@unique([tenantId, questionPaperVersionId, code])
+  @@unique([tenantId, questionPaperVersionId, displayOrder])
+  @@map("questions")
+}
+
+model QuestionPart {
+  id             String              @id @default(uuid()) @db.Uuid
+  tenantId       String              @map("tenant_id") @db.Uuid
+  questionId     String              @map("question_id") @db.Uuid
+  code           String              @db.VarChar(30)
+  label          String              @db.VarChar(80)
+  displayOrder   Int                 @map("display_order")
+  isRequired     Boolean             @default(true) @map("is_required")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  question       Question            @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  schemeItems    MarkingSchemeItem[]
+  extractedMarks ExtractedMark[]
+
+  @@unique([tenantId, questionId, code])
+  @@unique([tenantId, questionId, displayOrder])
+  @@map("question_parts")
+}
+
+model MarkingScheme {
+  id              String                 @id @default(uuid()) @db.Uuid
+  tenantId        String                 @map("tenant_id") @db.Uuid
+  questionPaperId String                 @map("question_paper_id") @db.Uuid
+  code            String                 @db.VarChar(80)
+  name            String                 @db.VarChar(200)
+  status          RecordStatus           @default(ACTIVE)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  questionPaper   QuestionPaper          @relation(fields: [questionPaperId], references: [id], onDelete: Restrict)
+  versions        MarkingSchemeVersion[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, questionPaperId])
+  @@map("marking_schemes")
+}
+
+model MarkingSchemeVersion {
+  id                     String                @id @default(uuid()) @db.Uuid
+  tenantId               String                @map("tenant_id") @db.Uuid
+  markingSchemeId        String                @map("marking_scheme_id") @db.Uuid
+  questionPaperVersionId String                @map("question_paper_version_id") @db.Uuid
+  version                Int
+  status                 VersionStatus         @default(DRAFT)
+  maximumMark            Decimal               @map("maximum_mark") @db.Decimal(7, 2)
+  confidenceThresholds   Json                  @map("confidence_thresholds") @db.JsonB
+  publishedAt            DateTime?             @map("published_at") @db.Timestamptz(6)
+  createdById            String?               @map("created_by_id") @db.Uuid
+  publishedById          String?               @map("published_by_id") @db.Uuid
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markingScheme          MarkingScheme         @relation(fields: [markingSchemeId], references: [id], onDelete: Restrict)
+  createdBy              User?                 @relation("SchemeVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  publishedBy            User?                 @relation("SchemeVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  selectedByPaperVersion QuestionPaperVersion? @relation("SelectedMarkingScheme")
+  questionPaperVersion   QuestionPaperVersion  @relation("SchemeSourcePaperVersion", fields: [questionPaperVersionId], references: [id], onDelete: Restrict)
+  items                  MarkingSchemeItem[]
+  markSheets             MarkSheet[]
+
+  @@unique([tenantId, markingSchemeId, version])
+  @@index([tenantId, questionPaperVersionId])
+  @@index([tenantId, status])
+  @@map("marking_scheme_versions")
+}
+
+model MarkingSchemeItem {
+  id                     String               @id @default(uuid()) @db.Uuid
+  tenantId               String               @map("tenant_id") @db.Uuid
+  markingSchemeVersionId String               @map("marking_scheme_version_id") @db.Uuid
+  questionId             String?              @map("question_id") @db.Uuid
+  questionPartId         String?              @map("question_part_id") @db.Uuid
+  parentItemId           String?              @map("parent_item_id") @db.Uuid
+  groupCode              String               @map("group_code") @db.VarChar(50)
+  displayOrder           Int                  @map("display_order")
+  maximumMark            Decimal              @map("maximum_mark") @db.Decimal(7, 2)
+  isScorable             Boolean              @default(true) @map("is_scorable")
+  isRequired             Boolean              @default(true) @map("is_required")
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markingSchemeVersion   MarkingSchemeVersion @relation(fields: [markingSchemeVersionId], references: [id], onDelete: Cascade)
+  question               Question?            @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  questionPart           QuestionPart?        @relation(fields: [questionPartId], references: [id], onDelete: Restrict)
+  parentItem             MarkingSchemeItem?   @relation("SchemeItemHierarchy", fields: [parentItemId], references: [id], onDelete: Restrict)
+  childItems             MarkingSchemeItem[]  @relation("SchemeItemHierarchy")
+  extractedMarks         ExtractedMark[]
+
+  @@unique([tenantId, markingSchemeVersionId, displayOrder])
+  @@unique([tenantId, markingSchemeVersionId, questionId, questionPartId])
+  @@index([tenantId, markingSchemeVersionId, groupCode])
+  @@map("marking_scheme_items")
+}
+
+model MarkSheet {
+  id                     String                @id @default(uuid()) @db.Uuid
+  tenantId               String                @map("tenant_id") @db.Uuid
+  studentId              String                @map("student_id") @db.Uuid
+  subjectOfferingId      String                @map("subject_offering_id") @db.Uuid
+  questionPaperVersionId String                @map("question_paper_version_id") @db.Uuid
+  markingSchemeVersionId String                @map("marking_scheme_version_id") @db.Uuid
+  attempt                Int                   @default(1)
+  status                 MarkSheetStatus       @default(UPLOADED)
+  handwrittenTotal       Decimal?              @map("handwritten_total") @db.Decimal(7, 2)
+  lockVersion            Int                   @default(0) @map("lock_version")
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  student                Student               @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  subjectOffering        SubjectOffering       @relation(fields: [subjectOfferingId], references: [id], onDelete: Restrict)
+  questionPaperVersion   QuestionPaperVersion  @relation(fields: [questionPaperVersionId], references: [id], onDelete: Restrict)
+  markingSchemeVersion   MarkingSchemeVersion  @relation(fields: [markingSchemeVersionId], references: [id], onDelete: Restrict)
+  images                 MarkSheetImage[]
+  extractedMarks         ExtractedMark[]
+  verificationSessions   VerificationSession[]
+  calculationResults     CalculationResult[]
+  processingJobs         ProcessingJob[]
+
+  @@unique([tenantId, studentId, subjectOfferingId, questionPaperVersionId, attempt])
+  @@index([tenantId, status])
+  @@map("mark_sheets")
+}
+
+model FileObject {
+  id              String           @id @default(uuid()) @db.Uuid
+  tenantId        String           @map("tenant_id") @db.Uuid
+  purpose         FilePurpose
+  bucket          String           @db.VarChar(120)
+  objectKey       String           @map("object_key") @db.VarChar(1024)
+  mimeType        String           @map("mime_type") @db.VarChar(150)
+  sizeBytes       BigInt           @map("size_bytes")
+  checksumSha256  String           @map("checksum_sha256") @db.Char(64)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markSheetImages MarkSheetImage[]
+  exports         Export[]
+  aiModelVersions AiModelVersion[]
+
+  @@unique([tenantId, bucket, objectKey])
+  @@index([tenantId, purpose])
+  @@map("file_objects")
+}
+
+model MarkSheetImage {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  markSheetId    String          @map("mark_sheet_id") @db.Uuid
+  fileObjectId   String          @map("file_object_id") @db.Uuid
+  pageNumber     Int             @map("page_number")
+  isOriginal     Boolean         @default(true) @map("is_original")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markSheet      MarkSheet       @relation(fields: [markSheetId], references: [id], onDelete: Cascade)
+  fileObject     FileObject      @relation(fields: [fileObjectId], references: [id], onDelete: Restrict)
+  extractedMarks ExtractedMark[]
+
+  @@unique([tenantId, markSheetId, pageNumber, isOriginal])
+  @@map("mark_sheet_images")
+}
+
+model AiModelVersion {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenantId       String          @map("tenant_id") @db.Uuid
+  name           String          @db.VarChar(120)
+  version        String          @db.VarChar(80)
+  checksumSha256 String?         @map("checksum_sha256") @db.Char(64)
+  artifactFileId String?         @map("artifact_file_id") @db.Uuid
+  configuration  Json            @db.JsonB
+  status         RecordStatus    @default(ACTIVE)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  artifactFile   FileObject?     @relation(fields: [artifactFileId], references: [id], onDelete: Restrict)
+  extractedMarks ExtractedMark[]
+  processingJobs ProcessingJob[]
+
+  @@unique([tenantId, name, version])
+  @@map("ai_model_versions")
+}
+
+model ExtractedMark {
+  id                  String             @id @default(uuid()) @db.Uuid
+  tenantId            String             @map("tenant_id") @db.Uuid
+  markSheetId         String             @map("mark_sheet_id") @db.Uuid
+  markingSchemeItemId String             @map("marking_scheme_item_id") @db.Uuid
+  questionId          String             @map("question_id") @db.Uuid
+  questionPartId      String?            @map("question_part_id") @db.Uuid
+  sourceImageId       String?            @map("source_image_id") @db.Uuid
+  aiModelVersionId    String?            @map("ai_model_version_id") @db.Uuid
+  rawText             String?            @map("raw_text") @db.VarChar(100)
+  extractedValue      Decimal?           @map("extracted_value") @db.Decimal(7, 2)
+  confidence          Decimal?           @db.Decimal(5, 4)
+  boundingBox         Json?              @map("bounding_box") @db.JsonB
+  extractionStatus    ExtractionStatus   @default(PENDING) @map("extraction_status")
+  verificationStatus  VerificationStatus @default(PENDING) @map("verification_status")
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markSheet           MarkSheet          @relation(fields: [markSheetId], references: [id], onDelete: Cascade)
+  markingSchemeItem   MarkingSchemeItem  @relation(fields: [markingSchemeItemId], references: [id], onDelete: Restrict)
+  question            Question           @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  questionPart        QuestionPart?      @relation(fields: [questionPartId], references: [id], onDelete: Restrict)
+  sourceImage         MarkSheetImage?    @relation(fields: [sourceImageId], references: [id], onDelete: SetNull)
+  aiModelVersion      AiModelVersion?    @relation(fields: [aiModelVersionId], references: [id], onDelete: SetNull)
+  values              MarkValue[]
+  verificationItems   VerificationItem[]
+
+  @@unique([tenantId, markSheetId, markingSchemeItemId])
+  @@index([tenantId, extractionStatus, verificationStatus])
+  @@map("extracted_marks")
+}
+
+model MarkValue {
+  id                String             @id @default(uuid()) @db.Uuid
+  tenantId          String             @map("tenant_id") @db.Uuid
+  extractedMarkId   String             @map("extracted_mark_id") @db.Uuid
+  value             Decimal            @db.Decimal(7, 2)
+  source            MarkValueSource
+  reason            String?
+  createdById       String?            @map("created_by_id") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  extractedMark     ExtractedMark      @relation(fields: [extractedMarkId], references: [id], onDelete: Restrict)
+  createdBy         User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  verificationItems VerificationItem[]
+
+  @@index([tenantId, extractedMarkId, createdAt])
+  @@map("mark_values")
+}
+
+model VerificationSession {
+  id            String                    @id @default(uuid()) @db.Uuid
+  tenantId      String                    @map("tenant_id") @db.Uuid
+  markSheetId   String                    @map("mark_sheet_id") @db.Uuid
+  assignedToId  String?                   @map("assigned_to_id") @db.Uuid
+  completedById String?                   @map("completed_by_id") @db.Uuid
+  status        VerificationSessionStatus @default(OPEN)
+  lockVersion   Int                       @default(0) @map("lock_version")
+  startedAt     DateTime                  @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt   DateTime?                 @map("completed_at") @db.Timestamptz(6)
+  tenant        Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markSheet     MarkSheet                 @relation(fields: [markSheetId], references: [id], onDelete: Restrict)
+  assignedTo    User?                     @relation("VerificationAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  completedBy   User?                     @relation("VerificationCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  items         VerificationItem[]
+
+  @@index([tenantId, status, assignedToId])
+  @@map("verification_sessions")
+}
+
+model VerificationItem {
+  id                    String              @id @default(uuid()) @db.Uuid
+  tenantId              String              @map("tenant_id") @db.Uuid
+  verificationSessionId String              @map("verification_session_id") @db.Uuid
+  extractedMarkId       String              @map("extracted_mark_id") @db.Uuid
+  selectedMarkValueId   String?             @map("selected_mark_value_id") @db.Uuid
+  status                VerificationStatus  @default(PENDING)
+  reason                String?
+  reviewedAt            DateTime?           @map("reviewed_at") @db.Timestamptz(6)
+  tenant                Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  verificationSession   VerificationSession @relation(fields: [verificationSessionId], references: [id], onDelete: Cascade)
+  extractedMark         ExtractedMark       @relation(fields: [extractedMarkId], references: [id], onDelete: Restrict)
+  selectedMarkValue     MarkValue?          @relation(fields: [selectedMarkValueId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, verificationSessionId, extractedMarkId])
+  @@index([tenantId, status])
+  @@map("verification_items")
+}
+
+model CalculationResult {
+  id                 String            @id @default(uuid()) @db.Uuid
+  tenantId           String            @map("tenant_id") @db.Uuid
+  markSheetId        String            @map("mark_sheet_id") @db.Uuid
+  calculationVersion Int               @map("calculation_version")
+  groupTotals        Json              @map("group_totals") @db.JsonB
+  grandTotal         Decimal           @map("grand_total") @db.Decimal(7, 2)
+  maximumMark        Decimal           @map("maximum_mark") @db.Decimal(7, 2)
+  percentage         Decimal           @db.Decimal(7, 4)
+  handwrittenTotal   Decimal?          @map("handwritten_total") @db.Decimal(7, 2)
+  status             CalculationStatus
+  inputDigest        String            @map("input_digest") @db.Char(64)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  tenant             Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markSheet          MarkSheet         @relation(fields: [markSheetId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, markSheetId, calculationVersion])
+  @@index([tenantId, status])
+  @@map("calculation_results")
+}
+
+model ProcessingJob {
+  id               String          @id @default(uuid()) @db.Uuid
+  tenantId         String          @map("tenant_id") @db.Uuid
+  markSheetId      String?         @map("mark_sheet_id") @db.Uuid
+  aiModelVersionId String?         @map("ai_model_version_id") @db.Uuid
+  type             JobType
+  status           JobStatus       @default(PENDING)
+  externalJobId    String?         @map("external_job_id") @db.VarChar(150)
+  attemptCount     Int             @default(0) @map("attempt_count")
+  payload          Json            @db.JsonB
+  result           Json?           @db.JsonB
+  errorCode        String?         @map("error_code") @db.VarChar(100)
+  errorMessage     String?         @map("error_message")
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt        DateTime?       @map("started_at") @db.Timestamptz(6)
+  completedAt      DateTime?       @map("completed_at") @db.Timestamptz(6)
+  tenant           Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  markSheet        MarkSheet?      @relation(fields: [markSheetId], references: [id], onDelete: Restrict)
+  aiModelVersion   AiModelVersion? @relation(fields: [aiModelVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, externalJobId])
+  @@index([tenantId, status, type])
+  @@map("processing_jobs")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  action        String   @db.VarChar(120)
+  entityType    String   @map("entity_type") @db.VarChar(120)
+  entityId      String?  @map("entity_id") @db.Uuid
+  oldValues     Json?    @map("old_values") @db.JsonB
+  newValues     Json?    @map("new_values") @db.JsonB
+  reason        String?
+  correlationId String?  @map("correlation_id") @db.Uuid
+  ipAddress     String?  @map("ip_address") @db.Inet
+  userAgent     String?  @map("user_agent") @db.VarChar(500)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  actor         User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}
+
+model Export {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @map("tenant_id") @db.Uuid
+  requestedById String       @map("requested_by_id") @db.Uuid
+  fileObjectId  String?      @map("file_object_id") @db.Uuid
+  format        ExportFormat
+  status        ExportStatus @default(PENDING)
+  filters       Json         @db.JsonB
+  errorMessage  String?      @map("error_message")
+  expiresAt     DateTime?    @map("expires_at") @db.Timestamptz(6)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt   DateTime?    @map("completed_at") @db.Timestamptz(6)
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  requestedBy   User         @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  fileObject    FileObject?  @relation(fields: [fileObjectId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, createdAt])
+  @@map("exports")
+}
+
+model Notification {
+  id        String             @id @default(uuid()) @db.Uuid
+  tenantId  String             @map("tenant_id") @db.Uuid
+  userId    String             @map("user_id") @db.Uuid
+  type      String             @db.VarChar(100)
+  title     String             @db.VarChar(200)
+  body      String
+  payload   Json?              @db.JsonB
+  status    NotificationStatus @default(UNREAD)
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  readAt    DateTime?          @map("read_at") @db.Timestamptz(6)
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, status, createdAt])
+  @@map("notifications")
+}

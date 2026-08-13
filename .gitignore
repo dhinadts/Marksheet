@@ -31,3 +31,4 @@ Thumbs.db
 
 # Local infrastructure data
 .data/
+graphify-out/

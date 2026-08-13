@@ -10,9 +10,17 @@
     "build": "npm run build --workspace frontend && npm run build --workspace backend",
     "lint": "npm run lint --workspace frontend && npm run lint --workspace backend",
     "test": "npm run test --workspace backend -- --runInBand",
-    "typecheck": "npm exec --workspace frontend -- tsc --noEmit && npm exec --workspace backend -- tsc --noEmit"
+    "typecheck": "npm exec --workspace frontend -- tsc --noEmit && npm exec --workspace backend -- tsc --noEmit",
+    "prisma:validate": "npm run prisma:validate --workspace backend",
+    "prisma:generate": "npm run prisma:generate --workspace backend",
+    "db:migrate": "npm run db:migrate --workspace backend",
+    "db:seed": "npm run db:seed --workspace backend",
+    "test:database": "npm run test:database --workspace backend"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "js-yaml": "^5.2.3"
   }
 }
