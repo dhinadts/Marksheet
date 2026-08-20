@@ -1,0 +1,20 @@
+variable "aws_region" { type = string
+  default = "ap-south-1" }
+variable "environment" { type = string
+  default = "production" }
+variable "project" { type = string
+  default = "ai-marks" }
+variable "vpc_cidr" { type = string
+  default = "10.40.0.0/16" }
+variable "database_instance_class" { type = string
+  default = "db.t4g.medium" }
+variable "database_name" { type = string
+  default = "ai_marks" }
+variable "database_username" { type = string
+  sensitive = true }
+variable "database_password" { type = string
+  sensitive = true }
+variable "allowed_app_security_group_ids" { type = list(string)
+  default = [] }
+locals { name = "${var.project}-${var.environment}"
+  tags = { Project = var.project, Environment = var.environment, ManagedBy = "Terraform" } }

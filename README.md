@@ -2,7 +2,7 @@
 
 AI Examination Marks Digitization & Valuation System is a multi-tenant SaaS platform for capturing examination mark sheets, extracting individual handwritten marks, validating them, and completing human-controlled verification and export workflows.
 
-This repository contains the foundations through **Phase 16**: monorepo setup,
+This repository contains the foundations through **Phase 20**: monorepo setup,
 PostgreSQL/Prisma, authentication and RBAC, tenant-scoped master data, and
 student/subject/question-paper management, plus administrator-managed marking-scheme
 authoring and validation. OCR and production workflows belong to later phases and are
