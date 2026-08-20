@@ -14,3 +14,10 @@ report roots, and cross-tenant student-detail concealment.
 
 Phase 16 tests dynamic question/group columns, CSV escaping, JSON output, XLSX ZIP/OpenXML
 containers, PDF containers, and rejection of export scopes containing unverified marks.
+# Phase 18 continuous verification
+
+GitHub Actions runs Node lint/type-check/unit/database/build jobs against PostgreSQL,
+Python Ruff/mypy/pytest, Flutter analysis/tests, and full Docker image builds. The
+calculation acceptance suite verifies the configurable 100-mark paper, invalid marks,
+confidence decisions, handwritten-total mismatch, and readiness for export. CI uses only
+ephemeral test credentials.
