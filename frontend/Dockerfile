@@ -4,6 +4,8 @@ COPY package*.json ./
 RUN npm ci
 
 FROM node:20-alpine AS builder
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
@@ -17,5 +19,5 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=dependencies /app/node_modules ./node_modules
 EXPOSE 3000
+USER node
 CMD ["npm", "run", "start"]
-

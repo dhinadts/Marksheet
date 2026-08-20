@@ -2,6 +2,10 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     ports:
@@ -31,6 +35,10 @@ services:
       AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
       AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-false}
       UPLOAD_URL_TTL_SECONDS: ${UPLOAD_URL_TTL_SECONDS:-900}
+      EXPORT_TTL_HOURS: ${EXPORT_TTL_HOURS:-24}
+      EXPORT_MAX_ROWS: ${EXPORT_MAX_ROWS:-10000}
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:
@@ -72,6 +80,8 @@ services:
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
       AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
       AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-false}
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
     healthcheck:
       test:
         [
@@ -106,6 +116,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
 
   postgres:
     build:
@@ -118,6 +130,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -131,6 +144,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
