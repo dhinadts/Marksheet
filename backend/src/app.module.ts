@@ -16,6 +16,7 @@ import { MarkingSchemesModule } from './marking-schemes/marking-schemes.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { MarkSheetsModule } from './mark-sheets/mark-sheets.module';
 import { CalculationsModule } from './calculations/calculations.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { CalculationsModule } from './calculations/calculations.module';
     UploadsModule,
     MarkSheetsModule,
     CalculationsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [

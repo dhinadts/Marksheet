@@ -60,3 +60,14 @@ All routes require a bearer token and are tenant-scoped by the authenticated ten
 Question labels, parts, maximums, groups, paper maximums, and confidence statuses come
 from versioned data. The calculation endpoint never uses OCR or handwritten totals as its
 grand total.
+
+# Reports
+
+All report endpoints require `report.read` and derive tenant identity from the token.
+
+- `GET /reports/summary` returns cards, confidence, and hierarchy breakdowns.
+- `GET /reports/classes` returns a paginated student/subject result table.
+- `GET /reports/students/:id` returns dynamic question/part marks and calculated totals.
+
+Filters cover organization and academic hierarchy UUIDs, subject/offering UUIDs, search,
+page, and page size. These routes return JSON data; file exports belong to Phase 16.

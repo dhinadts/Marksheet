@@ -28,3 +28,8 @@ and final authorization. Optimistic lock versions reject stale review submission
 corrections and calculation/mismatch decisions are append-only and audit logged with the
 actor and reason. Signed image downloads are short-lived; credentials and object keys are
 not embedded in frontend source.
+
+Phase 15 report roots include authenticated `tenantId`; nested organization filters cannot
+widen that boundary. Student detail verifies tenant ownership first, and `report.read`
+protects all reporting routes. Reports are read-only views of approved marks and immutable
+calculations.

@@ -8,3 +8,6 @@ validation. Calculation tests cover the administrator-configured 100-mark sample
 totals, handwritten-total mismatch handling, incomplete/invalid inputs, and deterministic
 digests. Run `npm test -- --runInBand` in `backend`, then lint, type-check, and build both
 backend and frontend.
+
+Phase 15 covers aggregation, hierarchy breakdowns, confidence summaries, tenant-scoped
+report roots, and cross-tenant student-detail concealment.
