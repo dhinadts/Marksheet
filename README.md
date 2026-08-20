@@ -112,6 +112,21 @@ creates any records. Completion verifies the stored object's size, media type, a
 metadata; client-provided completion claims are not trusted. See
 `docs/api/image-upload.md` for configuration and protocol details.
 
+## Phase 13 review and Phase 14 calculation
+
+Phase 13 accepts advisory extraction results for every scorable item in the selected
+scheme and creates an assigned verification session. Reviewers compare the signed source
+image with AI suggestions, and every correction appends a new mark value with its reason;
+AI values and earlier corrections are never overwritten. The web review workspace is at
+`/review/{markSheetId}` and reads `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`).
+The existing authentication flow must place the access token in session storage as
+`ai_marks_access_token`.
+
+Phase 14 calculates group and grand totals only from individual values in an approved
+verification session. Results are immutable, versioned, and input-digested. A handwritten
+total is comparison evidence only: mismatches require an authorized, reasoned resolution
+and create another result version. See `docs/api/README.md` for endpoints.
+
 ## Verification
 
 ```sh

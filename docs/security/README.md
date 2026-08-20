@@ -20,3 +20,11 @@ context exposes a transaction helper that sets `app.tenant_id` transaction-local
 future RLS-protected repositories. Full RLS policy activation remains coupled to the
 Phase 4 repository layer so ordinary Prisma queries cannot accidentally run outside the
 tenant transaction wrapper.
+# Phase 13–14 controls
+
+Review and calculation lookups include `tenantId` in every root query, and nested writes
+are reached only from those tenant-scoped roots. Permissions separate reading, reviewing,
+and final authorization. Optimistic lock versions reject stale review submissions. Mark
+corrections and calculation/mismatch decisions are append-only and audit logged with the
+actor and reason. Signed image downloads are short-lived; credentials and object keys are
+not embedded in frontend source.

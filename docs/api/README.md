@@ -44,3 +44,19 @@ Scheme items use request-local `clientKey` and optional `parentClientKey` values
 arbitrary question-part hierarchies. These keys are resolved to UUID relationships during
 one database transaction and are not persisted as business identifiers. The API derives
 group and paper totals from root item maximums and never accepts an OCR-extracted total.
+# Review and calculation
+
+All routes require a bearer token and are tenant-scoped by the authenticated tenant.
+
+- `POST /mark-sheets/:id/extractions` ingests one advisory AI result set and creates a review session (`mark.review`). Existing extraction history cannot be replaced.
+- `GET /mark-sheets/:id/review` returns signed images, the current session, dynamic scheme items, and complete value history (`mark_sheet.read`).
+- `PATCH /verification-sessions/:sessionId/items/:itemId` appends and selects a reviewer value; requires a reason and expected lock version (`mark.review`).
+- `POST /verification-sessions/:id/submit` requires every individual item to have a selected value (`mark.review`).
+- `POST /verification-sessions/:id/approve` authorizes the verified set (`mark.verify`).
+- `POST /mark-sheets/:id/calculations` creates or returns the idempotent calculation for the approved values (`mark.verify`).
+- `GET /mark-sheets/:id/calculations/latest` reads the newest immutable version (`mark_sheet.read`).
+- `POST /calculations/:id/resolve-total-mismatch` records a reasoned decision as a successor version (`mark.verify`).
+
+Question labels, parts, maximums, groups, paper maximums, and confidence statuses come
+from versioned data. The calculation endpoint never uses OCR or handwritten totals as its
+grand total.
