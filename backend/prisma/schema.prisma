@@ -549,6 +549,7 @@ model QuestionPaperVersion {
   version                Int
   status                 VersionStatus          @default(DRAFT)
   instructions           String?
+  imageTemplate          Json?                  @map("image_template") @db.JsonB
   publishedAt            DateTime?              @map("published_at") @db.Timestamptz(6)
   createdById            String?                @map("created_by_id") @db.Uuid
   publishedById          String?                @map("published_by_id") @db.Uuid

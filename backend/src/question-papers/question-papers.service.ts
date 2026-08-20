@@ -110,6 +110,33 @@ export class QuestionPapersService {
           `Part codes and display orders must be unique within ${question.code}`,
         );
     }
+    if (dto.imageTemplate) {
+      const cellKeys = new Set<string>();
+      for (const cell of dto.imageTemplate.cells) {
+        const question = dto.questions.find(
+          (candidate) => candidate.code === cell.questionCode,
+        );
+        const part = cell.questionPartCode
+          ? question?.parts.find(
+              (candidate) => candidate.code === cell.questionPartCode,
+            )
+          : undefined;
+        if (!question || (cell.questionPartCode && !part))
+          throw new BadRequestException(
+            `Image template cell references unknown question or part ${cell.questionCode}${cell.questionPartCode ? `.${cell.questionPartCode}` : ''}`,
+          );
+        const key = `${cell.questionCode}:${cell.questionPartCode ?? ''}`;
+        if (cellKeys.has(key))
+          throw new BadRequestException(
+            `Image template contains duplicate cell ${key}`,
+          );
+        if (cell.box.x + cell.box.width > 1 || cell.box.y + cell.box.height > 1)
+          throw new BadRequestException(
+            `Image template cell ${key} extends outside the normalized page`,
+          );
+        cellKeys.add(key);
+      }
+    }
     return this.tenant.transaction(this.prisma, async (tx) => {
       if (
         !(await tx.questionPaper.findFirst({
@@ -127,6 +154,12 @@ export class QuestionPapersService {
           questionPaperId: paperId,
           version: (latest._max.version ?? 0) + 1,
           instructions: dto.instructions,
+          ...(dto.imageTemplate
+            ? {
+                imageTemplate:
+                  dto.imageTemplate as unknown as Prisma.InputJsonValue,
+              }
+            : {}),
           createdById: actor.sub,
           questions: {
             create: dto.questions.map((question) => ({

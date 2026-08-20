@@ -58,6 +58,13 @@ Publication is a one-way integrity boundary in this phase. PostgreSQL triggers p
 changes to a published version and its scheme items/questions. A correction therefore
 requires a successor version, preserving historical mark-sheet interpretation.
 
+From Phase 11, `question_paper_versions.image_template` stores optional normalized,
+administrator-authored page geometry. Cells reference question/part codes in the same
+immutable paper version; authoring rejects unknown references, duplicate cells, and boxes
+outside the page. Before AI processing, NestJS resolves those codes and selected
+marking-scheme items to UUID-based template cells. The Python service never derives
+maximum marks or question structure from image position.
+
 ## Individual mark history
 
 `extracted_marks` contains the raw AI result, confidence, source image, bounding box,
