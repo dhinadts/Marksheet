@@ -61,6 +61,16 @@ Question labels, parts, maximums, groups, paper maximums, and confidence statuse
 from versioned data. The calculation endpoint never uses OCR or handwritten totals as its
 grand total.
 
+## Exports
+
+- `POST /exports` requires `export.create`. The body contains `format` (`CSV`, `XLSX`, `PDF`, or `JSON`) plus optional report filters.
+- `GET /exports/:id` requires `export.create` and returns tenant-owned status plus a signed download when completed.
+
+Creation is rejected when the selected scope is empty or contains any mark sheet that is
+not completed, approved, and `READY_FOR_EXPORT`. Question/part columns and maximums are
+derived from versioned schemes. Files are private and automatically transition to expired
+after their configured retention time.
+
 # Reports
 
 All report endpoints require `report.read` and derive tenant identity from the token.

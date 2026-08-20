@@ -18,6 +18,7 @@ function ReportsWorkspace() {
   const [summary, setSummary] = useState<Summary>();
   const [report, setReport] = useState<ClassReport>();
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState<string>();
   const query = searchParams.toString();
   const load = useCallback(async () => {
     try {
@@ -47,8 +48,20 @@ function ReportsWorkspace() {
     }
     window.location.search = params.toString();
   }
+  async function createExport(format: "CSV" | "XLSX" | "PDF" | "JSON") {
+    setExporting(format);
+    try {
+      const filters = Object.fromEntries(searchParams.entries());
+      const result = await apiRequest<{ download: { url: string } }>("/exports", { method: "POST", body: JSON.stringify({ ...filters, format }) });
+      window.location.assign(result.download.url);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to create export");
+    } finally {
+      setExporting(undefined);
+    }
+  }
   return <main className="min-h-screen bg-slate-100 p-4 text-slate-900 lg:p-8"><div className="mx-auto max-w-7xl">
-    <header><p className="text-sm font-semibold uppercase tracking-widest text-blue-700">AI-MARKS</p><h1 className="text-3xl font-bold">Reports</h1><p className="text-slate-600">Tenant-scoped results from verified marks and immutable calculations.</p></header>
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-semibold uppercase tracking-widest text-blue-700">AI-MARKS</p><h1 className="text-3xl font-bold">Reports</h1><p className="text-slate-600">Tenant-scoped results from verified marks and immutable calculations.</p></div><div className="flex flex-wrap gap-2">{(["CSV", "XLSX", "PDF", "JSON"] as const).map((format) => <button key={format} disabled={Boolean(exporting)} onClick={() => void createExport(format)} className="rounded-lg border border-blue-700 px-3 py-2 text-sm font-semibold text-blue-700 disabled:opacity-40">{exporting === format ? "Creating…" : format}</button>)}</div></header>
     <form onSubmit={filter} className="my-6 grid gap-3 rounded-xl bg-white p-4 shadow-sm md:grid-cols-4"><input name="search" defaultValue={searchParams.get("search") ?? ""} placeholder="Student or register number" className="rounded-lg border p-3" /><input name="classId" defaultValue={searchParams.get("classId") ?? ""} placeholder="Class UUID" className="rounded-lg border p-3" /><input name="subjectOfferingId" defaultValue={searchParams.get("subjectOfferingId") ?? ""} placeholder="Subject offering UUID" className="rounded-lg border p-3" /><button className="rounded-lg bg-blue-700 p-3 font-semibold text-white">Apply filters</button></form>
     {error && <p className="mb-4 rounded-lg bg-red-50 p-3 text-red-700">{error}</p>}
     {summary && <><section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{Object.entries(summary.cards).map(([key, value]) => <article key={key} className="rounded-xl bg-white p-4 shadow-sm"><p className="text-sm text-slate-500">{labels[key] ?? key}</p><p className="text-3xl font-bold">{value}</p></article>)}</section><section className="mt-5 rounded-xl bg-white p-5 shadow-sm"><h2 className="font-bold">Department processing</h2><div className="mt-3 space-y-2">{(summary.breakdowns.department ?? []).map((item) => <div key={item.id}><div className="flex justify-between text-sm"><span>{item.name}</span><span>{item.completed}/{item.total}</span></div><div className="h-2 rounded bg-slate-100"><div className="h-2 rounded bg-emerald-600" style={{ width: `${item.total ? item.completed / item.total * 100 : 0}%` }} /></div></div>)}</div><p className="mt-4 text-sm text-slate-500">Average AI confidence: {summary.confidence.average === null ? "No data" : `${(summary.confidence.average * 100).toFixed(1)}%`}</p></section></>}

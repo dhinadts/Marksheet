@@ -1,5 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, VerificationSessionStatus } from '@prisma/client';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import {
+  CalculationStatus,
+  MarkSheetStatus,
+  Prisma,
+  VerificationSessionStatus,
+} from '@prisma/client';
 import type { AccessClaims } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../database/tenant-context.service';
@@ -47,6 +57,7 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
+    private readonly config: ConfigService,
   ) {}
 
   summary(query: ReportQueryDto, actor: AccessClaims) {
@@ -185,6 +196,121 @@ export class ReportsService {
           };
         }),
       };
+    });
+  }
+
+  exportData(query: ReportQueryDto, actor: AccessClaims) {
+    return this.tenant.transaction(this.prisma, async (tx) => {
+      const maximumRows = Number(
+        this.config.get<string | number>('EXPORT_MAX_ROWS', 10000),
+      );
+      if (
+        !Number.isSafeInteger(maximumRows) ||
+        maximumRows < 1 ||
+        maximumRows > 100000
+      )
+        throw new Error('EXPORT_MAX_ROWS must be between 1 and 100000');
+      const sheets = await tx.markSheet.findMany({
+        where: this.where(query, actor.tenantId),
+        include: {
+          ...this.tenantReportInclude(actor.tenantId),
+          markingSchemeVersion: { include: { items: true } },
+          verificationSessions: {
+            where: {
+              tenantId: actor.tenantId,
+              status: VerificationSessionStatus.APPROVED,
+            },
+            orderBy: { completedAt: 'desc' },
+            take: 1,
+            include: {
+              items: {
+                where: { tenantId: actor.tenantId },
+                include: {
+                  selectedMarkValue: true,
+                  extractedMark: {
+                    include: {
+                      markingSchemeItem: {
+                        include: { question: true, questionPart: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ student: { registerNumber: 'asc' } }, { createdAt: 'asc' }],
+        take: maximumRows + 1,
+      });
+      if (sheets.length > maximumRows)
+        throw new BadRequestException(
+          `Export exceeds the configured ${maximumRows}-row limit; narrow the filters`,
+        );
+      if (!sheets.length)
+        throw new NotFoundException('No mark sheets match the export filters');
+      if (
+        sheets.some(
+          (sheet) =>
+            sheet.status !== MarkSheetStatus.COMPLETED ||
+            sheet.calculationResults[0]?.status !==
+              CalculationStatus.READY_FOR_EXPORT ||
+            !sheet.verificationSessions[0],
+        )
+      )
+        throw new BadRequestException(
+          'Export scope contains marks that are not fully verified and ready for export',
+        );
+      return sheets.map((sheet) => {
+        const offering = sheet.subjectOffering;
+        const academicClass = offering.section.class;
+        const department = academicClass.program.department;
+        const calculation = sheet.calculationResults[0];
+        const selected = new Map(
+          sheet.verificationSessions[0].items.map((item) => [
+            item.extractedMark.markingSchemeItemId,
+            item.selectedMarkValue?.value.toString() ?? null,
+          ]),
+        );
+        const marks = sheet.markingSchemeVersion.items
+          .filter((item) => item.isScorable)
+          .sort((a, b) => a.displayOrder - b.displayOrder)
+          .map((item) => {
+            const verificationItem = sheet.verificationSessions[0].items.find(
+              (entry) => entry.extractedMark.markingSchemeItemId === item.id,
+            );
+            const scheme = verificationItem?.extractedMark.markingSchemeItem;
+            const question =
+              scheme?.question?.label ?? `Item ${item.displayOrder}`;
+            const part = scheme?.questionPart?.label;
+            return {
+              key: part ? `${question}(${part})` : question,
+              value: selected.get(item.id) ?? null,
+              maximum: item.maximumMark.toString(),
+            };
+          });
+        return {
+          university: department.college.university.name,
+          college: department.college.name,
+          department: department.name,
+          program: academicClass.program.name,
+          academicYear: offering.academicYear.code,
+          studyYear: academicClass.studyYear.displayName,
+          semester: offering.semester.displayName,
+          class: academicClass.name,
+          section: offering.section.name,
+          subject: offering.subject.name,
+          subjectCode: offering.subject.code,
+          questionPaperCode: sheet.questionPaperVersion.questionPaper.code,
+          student: sheet.student.fullName,
+          registerNumber: sheet.student.registerNumber,
+          marks,
+          groupTotals: calculation.groupTotals as Record<string, string>,
+          grandTotal: calculation.grandTotal.toString(),
+          maximum: calculation.maximumMark.toString(),
+          percentage: calculation.percentage.toString(),
+          verificationStatus: calculation.status,
+        };
+      });
     });
   }
 

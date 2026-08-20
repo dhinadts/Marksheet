@@ -11,3 +11,6 @@ backend and frontend.
 
 Phase 15 covers aggregation, hierarchy breakdowns, confidence summaries, tenant-scoped
 report roots, and cross-tenant student-detail concealment.
+
+Phase 16 tests dynamic question/group columns, CSV escaping, JSON output, XLSX ZIP/OpenXML
+containers, PDF containers, and rejection of export scopes containing unverified marks.

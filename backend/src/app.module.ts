@@ -17,6 +17,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { MarkSheetsModule } from './mark-sheets/mark-sheets.module';
 import { CalculationsModule } from './calculations/calculations.module';
 import { ReportsModule } from './reports/reports.module';
+import { ExportsModule } from './exports/exports.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ReportsModule } from './reports/reports.module';
     MarkSheetsModule,
     CalculationsModule,
     ReportsModule,
+    ExportsModule,
   ],
   controllers: [AppController],
   providers: [

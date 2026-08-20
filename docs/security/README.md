@@ -33,3 +33,8 @@ Phase 15 report roots include authenticated `tenantId`; nested organization filt
 widen that boundary. Student detail verifies tenant ownership first, and `report.read`
 protects all reporting routes. Reports are read-only views of approved marks and immutable
 calculations.
+
+Phase 16 export records, source queries, files, and status lookups are tenant-scoped.
+`export.create` is required, unverified scopes are rejected atomically, generated files
+are SHA-256 checksummed in private object storage, and downloads use short-lived signed
+URLs. Request, completion, and failure transitions are audit logged.

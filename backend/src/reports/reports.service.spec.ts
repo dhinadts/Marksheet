@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment */
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { MarkSheetStatus } from '@prisma/client';
 import type { AccessClaims } from '../auth/auth.types';
 import { ReportsService } from './reports.service';
 
@@ -17,7 +18,11 @@ describe('ReportsService tenant isolation', () => {
     const tenant = {
       transaction: jest.fn((_prisma, callback) => callback(tx)),
     };
-    const service = new ReportsService({} as never, tenant as never);
+    const service = new ReportsService(
+      {} as never,
+      tenant as never,
+      { get: jest.fn().mockReturnValue(10000) } as never,
+    );
     await service.summary({ page: 1, pageSize: 25 }, actor);
     expect(tx.markSheet.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -30,7 +35,11 @@ describe('ReportsService tenant isolation', () => {
     const tenant = {
       transaction: jest.fn((_prisma, callback) => callback(tx)),
     };
-    const service = new ReportsService({} as never, tenant as never);
+    const service = new ReportsService(
+      {} as never,
+      tenant as never,
+      { get: jest.fn().mockReturnValue(10000) } as never,
+    );
     await expect(
       service.studentReport(
         '00000000-0000-4000-8000-000000000003',
@@ -44,5 +53,29 @@ describe('ReportsService tenant isolation', () => {
         tenantId: actor.tenantId,
       },
     });
+  });
+  it('rejects an export scope containing unverified marks', async () => {
+    const tx = {
+      markSheet: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            status: MarkSheetStatus.REVIEW_REQUIRED,
+            calculationResults: [],
+            verificationSessions: [],
+          },
+        ]),
+      },
+    };
+    const tenant = {
+      transaction: jest.fn((_prisma, callback) => callback(tx)),
+    };
+    const service = new ReportsService(
+      {} as never,
+      tenant as never,
+      { get: jest.fn().mockReturnValue(10000) } as never,
+    );
+    await expect(
+      service.exportData({ page: 1, pageSize: 25 }, actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

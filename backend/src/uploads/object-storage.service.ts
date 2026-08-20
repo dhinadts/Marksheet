@@ -31,6 +31,25 @@ export class ObjectStorageService {
     return this.sign('GET', objectKey, {});
   }
 
+  async putGenerated(
+    objectKey: string,
+    mimeType: string,
+    body: Buffer,
+  ): Promise<string> {
+    const checksum = this.sha256(body);
+    const signed = this.signUpload(objectKey, mimeType, checksum);
+    const response = await fetch(signed.url, {
+      method: 'PUT',
+      headers: signed.headers,
+      body: new Uint8Array(body),
+    });
+    if (!response.ok)
+      throw new ServiceUnavailableException(
+        'Generated file could not be stored',
+      );
+    return checksum;
+  }
+
   async inspect(
     objectKey: string,
   ): Promise<{ size: number; mimeType: string; checksum?: string }> {
@@ -132,7 +151,7 @@ export class ObjectStorageService {
       );
     return value;
   }
-  private sha256(value: string): string {
+  private sha256(value: string | Buffer): string {
     return createHash('sha256').update(value).digest('hex');
   }
   private hmac(key: string | Buffer, value: string): Buffer {

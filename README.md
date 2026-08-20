@@ -2,7 +2,7 @@
 
 AI Examination Marks Digitization & Valuation System is a multi-tenant SaaS platform for capturing examination mark sheets, extracting individual handwritten marks, validating them, and completing human-controlled verification and export workflows.
 
-This repository contains the foundations through **Phase 15**: monorepo setup,
+This repository contains the foundations through **Phase 16**: monorepo setup,
 PostgreSQL/Prisma, authentication and RBAC, tenant-scoped master data, and
 student/subject/question-paper management, plus administrator-managed marking-scheme
 authoring and validation. OCR and production workflows belong to later phases and are
@@ -132,7 +132,16 @@ and create another result version. See `docs/api/README.md` for endpoints.
 Users with `report.read` can view tenant-scoped summary, hierarchy, class, subject, and
 student reports. Reports use the newest immutable calculation per mark sheet and approved
 individual mark values. The responsive dashboard is available at `/reports`. Report APIs
-are documented in `docs/api/README.md`; file generation remains Phase 16 scope.
+are documented in `docs/api/README.md` and feed the Phase 16 export workflow.
+
+## Phase 16 exports
+
+Authorized users can generate CSV, XLSX, PDF, or JSON artifacts from the current report
+filters. Export creation fails if any matching mark sheet is not fully verified and
+`READY_FOR_EXPORT`. Generated files are checksummed, stored in private object storage,
+tracked in the export history, audit logged, and delivered through expiring signed URLs.
+Retention is configured with `EXPORT_TTL_HOURS` (1–168, default 24), while
+`EXPORT_MAX_ROWS` bounds per-request memory and artifact size.
 
 ## Verification
 
