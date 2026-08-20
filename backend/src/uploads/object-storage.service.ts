@@ -27,6 +27,10 @@ export class ObjectStorageService {
     });
   }
 
+  signDownload(objectKey: string): SignedRequest {
+    return this.sign('GET', objectKey, {});
+  }
+
   async inspect(
     objectKey: string,
   ): Promise<{ size: number; mimeType: string; checksum?: string }> {
@@ -48,7 +52,7 @@ export class ObjectStorageService {
   }
 
   private sign(
-    method: 'PUT' | 'HEAD',
+    method: 'PUT' | 'HEAD' | 'GET',
     objectKey: string,
     headers: Record<string, string>,
   ): SignedRequest {

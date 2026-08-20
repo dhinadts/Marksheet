@@ -14,6 +14,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { QuestionPapersModule } from './question-papers/question-papers.module';
 import { MarkingSchemesModule } from './marking-schemes/marking-schemes.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { MarkSheetsModule } from './mark-sheets/mark-sheets.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { UploadsModule } from './uploads/uploads.module';
     QuestionPapersModule,
     MarkingSchemesModule,
     UploadsModule,
+    MarkSheetsModule,
   ],
   controllers: [AppController],
   providers: [
