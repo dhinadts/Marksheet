@@ -1,161 +1,545 @@
 # AI-MARKS
 
-AI Examination Marks Digitization & Valuation System is a multi-tenant SaaS platform for capturing examination mark sheets, extracting individual handwritten marks, validating them, and completing human-controlled verification and export workflows.
+AI-MARKS is a multi-tenant examination mark digitization system. It captures mark-sheet
+images, runs advisory AI extraction, lets authorized people review every individual mark,
+calculates totals from verified values, and produces reports and private exports.
 
-This repository contains the foundations through **Phase 20**: monorepo setup,
-PostgreSQL/Prisma, authentication and RBAC, tenant-scoped master data, and
-student/subject/question-paper management, plus administrator-managed marking-scheme
-authoring and validation. OCR and production workflows belong to later phases and are
-intentionally not claimed complete.
+This guide explains how to run the project:
 
-The Flutter client provides secure login, data-driven academic/paper selection, guided
-camera capture, local image-quality preflight, durable offline queueing, and verified
-direct-to-object-storage upload. OCR and mark extraction remain later-phase work.
+1. On a local Windows, macOS, or Linux computer using Docker.
+2. On an AWS EC2 Ubuntu server using Docker Compose.
 
-The FastAPI service now provides configurable image-quality checks, document/perspective
-correction, deskewing, contrast enhancement, versioned normalized template-cell extraction,
-checksummed ONNX model loading, per-mark confidence/range validation, and a Redis-backed
-asynchronous worker boundary. AI values remain advisory and always require the authorized
-NestJS verification workflow before they can become final marks.
+> AI suggestions never finalize marks. A reviewer must validate individual marks before
+> calculation or export.
 
-## Applications
+## Project components
 
-| Directory         | Technology                               | Purpose                                              |
-| ----------------- | ---------------------------------------- | ---------------------------------------------------- |
-| `frontend/`       | Next.js, React, TypeScript, Tailwind CSS | Administrative and review dashboard                  |
-| `backend/`        | NestJS, TypeScript                       | Main API and business layer                          |
-| `mobile/`         | Flutter, Dart                            | Capture and mobile verification client               |
-| `ai-service/`     | FastAPI, Python                          | Isolated image-processing and inference service      |
-| `database/`       | PostgreSQL assets                        | Migrations, seed support, and database documentation |
-| `infrastructure/` | Docker and future Terraform              | Local and production infrastructure                  |
-| `assets/`         | Private development references           | Sample mark sheets and related non-training assets   |
+| Component | Technology | Default address |
+| --- | --- | --- |
+| Web application | Next.js | `http://localhost:3000` |
+| Main API and Swagger | NestJS | `http://localhost:3001` and `/api/docs` |
+| AI service | FastAPI | `http://localhost:8000/health` |
+| Database | PostgreSQL 17 | `localhost:5432` |
+| Queue/cache | Redis 7 | `localhost:6379` |
+| Mobile application | Flutter | Runs separately on Android/iOS |
 
-## Configurable marking schemes
+Question numbers, question parts, maximum marks, confidence thresholds, and paper totals
+are versioned administrator data. They are not hard-coded application rules.
 
-Question numbers, parts, and maximum marks are domain data—not constants in application code. For the sample paper, an administrator creates a scheme with Q1–Q10 at 2 marks each, Q11–Q15 at 13 marks each, and Q16 at 15 marks. A different paper creates a different scheme without a software release. See `docs/architecture/marking-scheme.md`.
+## Before you start
 
-## Prerequisites
+The easiest setup uses Docker Compose. Install:
 
-Published question-paper and marking-scheme versions are immutable. Individual AI,
-reviewer, and calculated values are stored as separate records so examination history
-is preserved rather than overwritten.
+- [Git](https://git-scm.com/downloads)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) on Windows/macOS, or Docker Engine on Linux
+- An AWS account and a private S3 bucket if you want image upload and export downloads
 
-- Node.js 20+
-- Python 3.12+
-- Flutter SDK
-- Docker Desktop with Docker Compose
+Docker Desktop users must start Docker Desktop and wait until its engine says it is running.
 
-## Local setup
+## Local installation with Docker
 
-1. Copy `.env.example` to `.env` and replace development placeholders as appropriate.
-2. Install application dependencies:
+### 1. Download the project
 
-   ```sh
-   npm install
-   python -m pip install -e "./ai-service[dev]"
-   cd mobile && flutter pub get
-   ```
-
-3. Run all services:
-
-   ```sh
-   docker compose up -d --build
-   ```
-
-4. Open the frontend at `http://localhost:3000`, backend at `http://localhost:3001`, and AI health endpoint at `http://localhost:8000/health`.
-
-## Database
-
-The canonical Prisma schema, migration, and idempotent development seed are in
-`backend/prisma/`. Apply them from a network location where `DATABASE_URL` resolves:
+Open PowerShell, Terminal, or a Linux shell:
 
 ```sh
-npm run prisma:validate
-npm run prisma:generate
-npm run db:migrate
-npm run db:seed
+git clone https://github.com/dhinadts/Marksheet.git
+cd Marksheet
 ```
 
-For local host commands, set `DATABASE_URL` to use `localhost`; the Compose backend
-uses the `postgres` service hostname. The development seed creates the demo hierarchy,
-roles and permissions, 20 students, and the configurable Q0013 marking scheme.
+If you already have the project, enter its folder instead. In this development workspace
+the folder is `D:\Nagarajan`.
 
-If `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` are configured, seeding also creates a
-development super administrator. Swagger is served at `http://localhost:3001/api/docs`.
+### 2. Create the environment file
 
-## Phase 4 and 5 APIs
+Windows PowerShell:
 
-Authenticated catalog APIs are exposed under `/catalog/:resource`. Supported resources
-are `universities`, `colleges`, `departments`, `programs`, `academic-years`,
-`study-years`, `semesters`, `classes`, `sections`, `students`, `subjects`, and
-`subject-offerings`. Lists accept `page`, `pageSize`, `search`, and `status`. Updates
-require `expectedUpdatedAt` for optimistic concurrency; lifecycle changes use
-`PATCH /catalog/:resource/:id/status`, so records are deactivated rather than deleted.
+```powershell
+Copy-Item .env.example .env
+```
 
-Question-paper APIs under `/question-papers` create paper identities and immutable,
-dynamic versions with any number of questions and parts. Draft versions can be previewed
-and published after a valid scheme has been published. Student CSV files can be preflighted without mutation at
-`POST /catalog/students/import/validate`.
-
-Marking-scheme APIs under `/marking-schemes` create versioned configurations against an
-exact question-paper version. Publication validates individual question and part maximums,
-parent/child totals, paper totals, group membership, and administrator-defined confidence
-thresholds. Published versions and their items are immutable.
-
-## Phase 8 image upload
-
-Authenticated users with `mark_sheet.upload` can request a short-lived upload session at
-`POST /mark-sheets/upload-sessions`, upload the image directly to configured S3-compatible
-storage, and finalize verification at `POST /mark-sheets/:id/upload-complete`. The API
-validates the tenant-owned student, offering, paper version, and scheme version before it
-creates any records. Completion verifies the stored object's size, media type, and SHA-256
-metadata; client-provided completion claims are not trusted. See
-`docs/api/image-upload.md` for configuration and protocol details.
-
-## Phase 13 review and Phase 14 calculation
-
-Phase 13 accepts advisory extraction results for every scorable item in the selected
-scheme and creates an assigned verification session. Reviewers compare the signed source
-image with AI suggestions, and every correction appends a new mark value with its reason;
-AI values and earlier corrections are never overwritten. The web review workspace is at
-`/review/{markSheetId}` and reads `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`).
-The existing authentication flow must place the access token in session storage as
-`ai_marks_access_token`.
-
-Phase 14 calculates group and grand totals only from individual values in an approved
-verification session. Results are immutable, versioned, and input-digested. A handwritten
-total is comparison evidence only: mismatches require an authorized, reasoned resolution
-and create another result version. See `docs/api/README.md` for endpoints.
-
-## Phase 15 reports
-
-Users with `report.read` can view tenant-scoped summary, hierarchy, class, subject, and
-student reports. Reports use the newest immutable calculation per mark sheet and approved
-individual mark values. The responsive dashboard is available at `/reports`. Report APIs
-are documented in `docs/api/README.md` and feed the Phase 16 export workflow.
-
-## Phase 16 exports
-
-Authorized users can generate CSV, XLSX, PDF, or JSON artifacts from the current report
-filters. Export creation fails if any matching mark sheet is not fully verified and
-`READY_FOR_EXPORT`. Generated files are checksummed, stored in private object storage,
-tracked in the export history, audit logged, and delivered through expiring signed URLs.
-Retention is configured with `EXPORT_TTL_HOURS` (1–168, default 24), while
-`EXPORT_MAX_ROWS` bounds per-request memory and artifact size.
-
-## Verification
+macOS/Linux:
 
 ```sh
-npm run build
+cp .env.example .env
+```
+
+Open `.env` in a text editor. At minimum, replace these values:
+
+```env
+NODE_ENV=development
+
+POSTGRES_DB=ai_marks
+POSTGRES_USER=ai_marks
+POSTGRES_PASSWORD=choose-a-long-local-database-password
+DATABASE_URL=postgresql://ai_marks:choose-a-long-local-database-password@postgres:5432/ai_marks?schema=public
+
+JWT_SECRET=replace-with-a-random-secret-at-least-32-characters-long
+AI_INTERNAL_API_KEY=replace-with-another-long-random-secret
+
+SEED_ADMIN_EMAIL=admin@example.test
+SEED_ADMIN_PASSWORD=choose-a-password-at-least-12-characters
+
+CORS_ORIGINS=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:3001
+```
+
+The password in `POSTGRES_PASSWORD` and `DATABASE_URL` must be identical. URL-encode
+special characters in `DATABASE_URL`; beginners can initially use letters, digits, `_`,
+and `-` to avoid URL-encoding mistakes.
+
+Generate a random secret with Node.js if needed:
+
+```sh
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+Run it twice and use different values for `JWT_SECRET` and `AI_INTERNAL_API_KEY`.
+
+### 3. Configure private S3 storage
+
+Without S3 configuration, the application and reports can start, but image upload and
+generated export storage will fail.
+
+Create a private S3 bucket in the AWS console. Keep **Block all public access** enabled.
+Create a dedicated IAM identity with access only to that bucket, then add this to `.env`:
+
+```env
+AWS_REGION=ap-south-1
+AWS_ACCESS_KEY_ID=replace-with-dedicated-access-key
+AWS_SECRET_ACCESS_KEY=replace-with-dedicated-secret-key
+AWS_S3_BUCKET=replace-with-private-bucket-name
+AWS_S3_ENDPOINT=
+AWS_S3_FORCE_PATH_STYLE=false
+UPLOAD_URL_TTL_SECONDS=900
+EXPORT_TTL_HOURS=24
+EXPORT_MAX_ROWS=10000
+```
+
+Never commit `.env` or real AWS credentials. For browser/mobile direct uploads, configure
+the bucket CORS policy for the origins that will use the application. A local example is:
+
+```json
+[
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
+    "AllowedOrigins": ["http://localhost:3000"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+### 4. Build and start everything
+
+```sh
+docker compose up -d --build
+```
+
+The first build can take several minutes. Check service status:
+
+```sh
+docker compose ps
+```
+
+All main services should eventually show `running` or `healthy`. Watch logs if a service
+does not start:
+
+```sh
+docker compose logs -f backend
+docker compose logs -f ai-service
+docker compose logs -f frontend
+```
+
+The backend automatically applies committed Prisma migrations when its container starts.
+
+### 5. Load demonstration data
+
+```sh
+docker compose exec backend npm run db:seed
+```
+
+The seed is idempotent, so it is safe to run again. It creates:
+
+- Tenant ID: `00000000-0000-4000-8000-000000000001`
+- Demo university, college, department, class, section, and subject
+- 20 demo students
+- Question paper `Q0013`
+- A configurable 100-mark scheme
+- The administrator configured by `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD`
+
+### 6. Verify the services
+
+Open these addresses:
+
+- Web: [http://localhost:3000](http://localhost:3000)
+- Swagger API: [http://localhost:3001/api/docs](http://localhost:3001/api/docs)
+- Backend health/identity: [http://localhost:3001](http://localhost:3001)
+- AI health: [http://localhost:8000/health](http://localhost:8000/health)
+
+Windows users can run the automated smoke script:
+
+```powershell
+.\scripts\smoke.ps1
+```
+
+### 7. Log in and use the current web screens
+
+The current web application has review and report screens, but it does not yet include a
+web login form. Obtain an access token through Swagger:
+
+1. Open `http://localhost:3001/api/docs`.
+2. Expand `POST /auth/login` and select **Try it out**.
+3. Submit:
+
+   ```json
+   {
+     "tenantId": "00000000-0000-4000-8000-000000000001",
+     "email": "admin@example.test",
+     "password": "the-password-from-SEED_ADMIN_PASSWORD"
+   }
+   ```
+
+4. Copy `accessToken` from the response.
+5. Open `http://localhost:3000`, press `F12`, select **Console**, and run:
+
+   ```js
+   sessionStorage.setItem('ai_marks_access_token', 'PASTE_ACCESS_TOKEN_HERE')
+   ```
+
+6. Refresh the page. Open `/reports`, or enter a mark-sheet UUID on the home page.
+
+The token is removed when the browser session ends. Do not paste a production token into
+screenshots, messages, or source files.
+
+## Useful local commands
+
+```sh
+# Stop containers but keep database data
+docker compose down
+
+# Stop containers and delete local PostgreSQL/Redis volumes (destructive)
+docker compose down -v
+
+# Restart after configuration changes
+docker compose up -d --build
+
+# View all logs
+docker compose logs -f
+
+# Run the optional AI worker
+docker compose --profile ai-processing up -d ai-worker
+
+# Apply migrations manually
+docker compose exec backend npm run db:migrate
+
+# Seed demo data
+docker compose exec backend npm run db:seed
+```
+
+## Running tests locally
+
+For application development, also install Node.js 20+, Python 3.12+, and Flutter. Then:
+
+```sh
+npm install
 npm run lint
 npm run typecheck
 npm test
-npm run test:database
-python -m pytest ai-service/tests
+npm run build
+npm run prisma:validate
+
+python -m pip install -e "./ai-service[dev]"
 python -m ruff check ai-service
 python -m mypy ai-service/app
-cd mobile && flutter analyze && flutter test
-docker compose config
+python -m pytest ai-service/tests
+
+cd mobile
+flutter pub get
+flutter analyze
+flutter test
 ```
 
-On Windows without `make`, run these commands directly. The Makefile provides equivalent shortcuts on environments that include GNU Make.
+## Flutter mobile application
+
+The mobile application is not started by Docker Compose. Install Flutter and connect a
+device or emulator.
+
+Android emulator:
+
+```sh
+cd mobile
+flutter pub get
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3001
+```
+
+Physical phone on the same Wi-Fi:
+
+```sh
+flutter run --dart-define=API_BASE_URL=http://YOUR_COMPUTER_LAN_IP:3001
+```
+
+Allow port `3001` through the computer firewall when using a physical phone.
+
+## AWS EC2 Ubuntu deployment
+
+This section describes a simple single-server deployment suitable for demonstration or
+controlled pilot use. A high-availability production deployment should use the Terraform
+foundation in `infrastructure/terraform`, RDS, ElastiCache, ECS, an Application Load
+Balancer, ACM certificates, managed secrets, monitoring, and tested backups.
+
+### 1. Create the EC2 instance
+
+In AWS EC2:
+
+1. Choose Ubuntu Server 24.04 LTS.
+2. Use at least `t3.large` for the complete stack; AI inference may require a larger or GPU instance.
+3. Allocate at least 40 GB of encrypted storage.
+4. Attach an Elastic IP so the public address does not change.
+5. Configure the security group:
+
+   | Port | Source | Purpose |
+   | --- | --- | --- |
+   | 22 | Your public IP only | SSH |
+   | 3000 | Your trusted IP range initially | Web application |
+   | 3001 | Your trusted IP range initially | API and Swagger |
+
+Do not expose PostgreSQL `5432`, Redis `6379`, or AI port `8000` publicly. For a public
+production site, expose only ports 80/443 through Nginx or an AWS load balancer.
+
+### 2. Connect by SSH
+
+```sh
+chmod 400 your-key.pem
+ssh -i your-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
+```
+
+### 3. Install Docker and Git
+
+```sh
+sudo apt update
+sudo apt install -y ca-certificates curl git
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker ubuntu
+exit
+```
+
+Reconnect by SSH so the Docker group change takes effect, then verify:
+
+```sh
+docker --version
+docker compose version
+```
+
+### 4. Clone and configure AI-MARKS
+
+```sh
+git clone https://github.com/dhinadts/Marksheet.git
+cd Marksheet
+cp .env.example .env
+nano .env
+```
+
+Use strong, unique production values. Replace `YOUR_EC2_PUBLIC_IP` below:
+
+```env
+NODE_ENV=production
+
+POSTGRES_DB=ai_marks
+POSTGRES_USER=ai_marks
+POSTGRES_PASSWORD=REPLACE_WITH_A_LONG_RANDOM_DATABASE_PASSWORD
+DATABASE_URL=postgresql://ai_marks:REPLACE_WITH_THE_SAME_PASSWORD@postgres:5432/ai_marks?schema=public
+REDIS_URL=redis://redis:6379
+
+JWT_SECRET=REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS
+AI_INTERNAL_API_KEY=REPLACE_WITH_A_DIFFERENT_RANDOM_SECRET
+JWT_ACCESS_TTL_SECONDS=900
+JWT_REFRESH_TTL_SECONDS=2592000
+AUTH_MAX_FAILED_ATTEMPTS=5
+
+CORS_ORIGINS=http://YOUR_EC2_PUBLIC_IP:3000
+NEXT_PUBLIC_API_URL=http://YOUR_EC2_PUBLIC_IP:3001
+AI_SERVICE_URL=http://ai-service:8000
+AI_ENVIRONMENT=production
+
+AWS_REGION=ap-south-1
+AWS_ACCESS_KEY_ID=REPLACE_WITH_DEDICATED_KEY
+AWS_SECRET_ACCESS_KEY=REPLACE_WITH_DEDICATED_SECRET
+AWS_S3_BUCKET=REPLACE_WITH_PRIVATE_BUCKET
+AWS_S3_ENDPOINT=
+AWS_S3_FORCE_PATH_STYLE=false
+
+SEED_ADMIN_EMAIL=admin@your-domain.example
+SEED_ADMIN_PASSWORD=REPLACE_WITH_A_STRONG_ADMIN_PASSWORD
+```
+
+Update the S3 CORS `AllowedOrigins` value to `http://YOUR_EC2_PUBLIC_IP:3000`. Do not use
+`*` for production CORS.
+
+Protect the environment file:
+
+```sh
+chmod 600 .env
+```
+
+### 5. Start, seed, and verify
+
+```sh
+docker compose up -d --build
+docker compose ps
+docker compose exec backend npm run db:seed
+curl http://localhost:3001/
+curl http://localhost:8000/health
+curl -I http://localhost:3000/
+```
+
+From your own computer, open:
+
+- `http://YOUR_EC2_PUBLIC_IP:3000`
+- `http://YOUR_EC2_PUBLIC_IP:3001/api/docs`
+
+Follow the earlier Swagger login instructions using the seeded tenant ID and production
+administrator credentials.
+
+### 6. Enable the AI worker
+
+```sh
+docker compose --profile ai-processing up -d ai-worker
+docker compose logs -f ai-worker
+```
+
+If no valid ONNX model path and checksum are configured, the service remains a prototype
+pipeline and must not be represented as having production handwriting accuracy.
+
+### 7. Updating the EC2 deployment
+
+Take a database backup before migrations or major releases. Then:
+
+```sh
+cd ~/Marksheet
+git pull --ff-only origin main
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail=100 backend
+```
+
+The backend container applies forward Prisma migrations before starting. Never use
+`prisma migrate reset` on production data.
+
+### 8. Backing up the EC2 database
+
+Create a backup directory and dump PostgreSQL:
+
+```sh
+mkdir -p ~/ai-marks-backups
+docker compose exec -T postgres pg_dump -U ai_marks -d ai_marks -Fc > ~/ai-marks-backups/ai_marks_$(date +%F_%H%M).dump
+```
+
+Copy backups to encrypted S3 and test restoration regularly. A database backup does not
+replace S3 object versioning; both database records and mark-sheet files are required.
+
+### 9. HTTPS recommendation
+
+Do not expose a real examination system permanently over plain HTTP. Use an AWS
+Application Load Balancer with ACM, or install Nginx and obtain a TLS certificate for a
+domain. After HTTPS is available, rebuild with:
+
+```env
+CORS_ORIGINS=https://marks.your-domain.example
+NEXT_PUBLIC_API_URL=https://api.marks.your-domain.example
+```
+
+Only ports 80/443 should remain publicly accessible after the reverse proxy is working.
+
+## Troubleshooting
+
+### Docker cannot connect
+
+Start Docker Desktop, or on Ubuntu run:
+
+```sh
+sudo systemctl enable --now docker
+```
+
+### Backend repeatedly restarts
+
+```sh
+docker compose logs --tail=200 backend
+```
+
+Check that `JWT_SECRET` is at least 32 characters, passwords match, required AWS settings
+exist in production, and `DATABASE_URL` contains the Docker hostname `postgres`.
+
+### Frontend calls localhost on EC2
+
+`NEXT_PUBLIC_API_URL` is embedded during the frontend image build. Correct `.env`, then
+force a rebuild:
+
+```sh
+docker compose build --no-cache frontend
+docker compose up -d frontend
+```
+
+### Seeded administrator cannot log in
+
+Ensure the seed completed and use the fixed demo tenant ID:
+
+```sh
+docker compose exec backend npm run db:seed
+```
+
+Passwords must contain at least 12 characters.
+
+### Upload reports that the bucket is unavailable
+
+Verify the AWS region, bucket name, dedicated credentials, S3 permissions, bucket CORS,
+and EC2 clock. Signed requests fail when the system clock is incorrect.
+
+### Resetting local data
+
+Only do this for disposable local development data:
+
+```sh
+docker compose down -v
+docker compose up -d --build
+docker compose exec backend npm run db:seed
+```
+
+Never run this reset procedure on an EC2 production or pilot database.
+
+## Security checklist before real use
+
+- Replace every placeholder and use unique secrets.
+- Keep `.env` readable only by the deployment user.
+- Restrict SSH to administrator IP addresses.
+- Do not expose PostgreSQL, Redis, or the AI service publicly.
+- Use HTTPS and a trusted domain.
+- Keep the S3 bucket private with public access blocked.
+- Use least-privilege AWS credentials and rotate them.
+- Enable encrypted backups, monitoring, alarms, and restore drills.
+- Review audit logs and user permissions.
+- Never claim unmeasured AI accuracy.
+
+## Additional documentation
+
+- [API documentation](docs/api/README.md)
+- [Architecture](docs/architecture/system-architecture.md)
+- [Database design](docs/database/database-design.md)
+- [Security](docs/security/README.md)
+- [Testing](docs/testing/README.md)
+- [Deployment](docs/deployment/README.md)
+- [AWS Terraform foundation](infrastructure/terraform/README.md)
+
+## Current limitations
+
+- The web interface currently requires a token obtained through the API; a web login page is not yet included.
+- A production ONNX handwriting model and measured accuracy are deployment-specific.
+- The simple EC2 Compose topology is not highly available.
+- PDF export currently replaces unsupported non-ASCII glyphs.
+- Terraform provisions the AWS foundation; environment-specific ECS services, load balancers, DNS, certificates, autoscaling, and alarms still require deployment decisions.
