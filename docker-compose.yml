@@ -18,11 +18,19 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://ai_marks:change-me@postgres:5432/ai_marks?schema=public}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
+      AI_INTERNAL_API_KEY: ${AI_INTERNAL_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me}
       JWT_ACCESS_TTL_SECONDS: ${JWT_ACCESS_TTL_SECONDS:-900}
       JWT_REFRESH_TTL_SECONDS: ${JWT_REFRESH_TTL_SECONDS:-2592000}
       AUTH_MAX_FAILED_ATTEMPTS: ${AUTH_MAX_FAILED_ATTEMPTS:-5}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
+      AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-false}
+      UPLOAD_URL_TTL_SECONDS: ${UPLOAD_URL_TTL_SECONDS:-900}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:
@@ -33,7 +41,13 @@ services:
       ai-service:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3001').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3001').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,8 +57,19 @@ services:
       context: ./ai-service
     ports:
       - "${AI_SERVICE_PORT:-8000}:8000"
+    environment:
+      AI_INTERNAL_API_KEY: ${AI_INTERNAL_API_KEY:-}
+      AI_ENVIRONMENT: ${AI_ENVIRONMENT:-development}
+      AI_LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
+      AI_MAX_IMAGE_BYTES: ${AI_MAX_IMAGE_BYTES:-26214400}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

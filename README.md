@@ -2,27 +2,32 @@
 
 AI Examination Marks Digitization & Valuation System is a multi-tenant SaaS platform for capturing examination mark sheets, extracting individual handwritten marks, validating them, and completing human-controlled verification and export workflows.
 
-This repository contains the foundations through **Phase 7**: monorepo setup,
+This repository contains the foundations through **Phase 9**: monorepo setup,
 PostgreSQL/Prisma, authentication and RBAC, tenant-scoped master data, and
 student/subject/question-paper management, plus administrator-managed marking-scheme
 authoring and validation. OCR and production workflows belong to later phases and are
 intentionally not claimed complete.
 
-The Phase 7 Flutter client now provides secure login, data-driven academic/paper selection,
-guided camera capture, local image-quality preflight, and an offline queue boundary. Image
-upload and server-side processing remain Phase 8 and later work.
+The Flutter client provides secure login, data-driven academic/paper selection, guided
+camera capture, local image-quality preflight, durable offline queueing, and verified
+direct-to-object-storage upload. OCR and mark extraction remain later-phase work.
+
+The Phase 9 FastAPI service exposes a strict authenticated internal API contract,
+liveness/readiness checks, capability reporting, correlation IDs, and tenant-scoped object
+references. Image-processing routes explicitly remain unavailable until their owning phase,
+so no prototype behavior is represented as production inference.
 
 ## Applications
 
-| Directory | Technology | Purpose |
-| --- | --- | --- |
-| `frontend/` | Next.js, React, TypeScript, Tailwind CSS | Administrative and review dashboard |
-| `backend/` | NestJS, TypeScript | Main API and business layer |
-| `mobile/` | Flutter, Dart | Capture and mobile verification client |
-| `ai-service/` | FastAPI, Python | Isolated image-processing and inference service |
-| `database/` | PostgreSQL assets | Migrations, seed support, and database documentation |
-| `infrastructure/` | Docker and future Terraform | Local and production infrastructure |
-| `assets/` | Private development references | Sample mark sheets and related non-training assets |
+| Directory         | Technology                               | Purpose                                              |
+| ----------------- | ---------------------------------------- | ---------------------------------------------------- |
+| `frontend/`       | Next.js, React, TypeScript, Tailwind CSS | Administrative and review dashboard                  |
+| `backend/`        | NestJS, TypeScript                       | Main API and business layer                          |
+| `mobile/`         | Flutter, Dart                            | Capture and mobile verification client               |
+| `ai-service/`     | FastAPI, Python                          | Isolated image-processing and inference service      |
+| `database/`       | PostgreSQL assets                        | Migrations, seed support, and database documentation |
+| `infrastructure/` | Docker and future Terraform              | Local and production infrastructure                  |
+| `assets/`         | Private development references           | Sample mark sheets and related non-training assets   |
 
 ## Configurable marking schemes
 
@@ -95,6 +100,16 @@ Marking-scheme APIs under `/marking-schemes` create versioned configurations aga
 exact question-paper version. Publication validates individual question and part maximums,
 parent/child totals, paper totals, group membership, and administrator-defined confidence
 thresholds. Published versions and their items are immutable.
+
+## Phase 8 image upload
+
+Authenticated users with `mark_sheet.upload` can request a short-lived upload session at
+`POST /mark-sheets/upload-sessions`, upload the image directly to configured S3-compatible
+storage, and finalize verification at `POST /mark-sheets/:id/upload-complete`. The API
+validates the tenant-owned student, offering, paper version, and scheme version before it
+creates any records. Completion verifies the stored object's size, media type, and SHA-256
+metadata; client-provided completion claims are not trusted. See
+`docs/api/image-upload.md` for configuration and protocol details.
 
 ## Verification
 
