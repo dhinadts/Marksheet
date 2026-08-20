@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
 
 class QueuedCapture {
   const QueuedCapture({
@@ -44,21 +47,27 @@ class OfflineCaptureQueue {
         .toList();
   }
 
-  Future<void> enqueue(String imagePath, Map<String, String> context) async {
+  Future<QueuedCapture> enqueue(String imagePath, Map<String, String> context) async {
     final entries = await read();
     final now = DateTime.now().toUtc();
-    entries.add(
-      QueuedCapture(
-        id: '${now.microsecondsSinceEpoch}',
-        imagePath: imagePath,
-        context: context,
-        createdAt: now,
-      ),
-    );
+    final id = _uuid();
+    final directory = Directory('${(await getApplicationDocumentsDirectory()).path}/capture-queue');
+    await directory.create(recursive: true);
+    final sourceExtension = imagePath.contains('.')
+        ? imagePath.split('.').last.toLowerCase()
+        : '';
+    final extension = const {'jpg', 'jpeg', 'png', 'heic'}.contains(sourceExtension)
+        ? sourceExtension
+        : 'jpg';
+    final durablePath = '${directory.path}/$id.$extension';
+    await File(imagePath).copy(durablePath);
+    final entry = QueuedCapture(id: id, imagePath: durablePath, context: context, createdAt: now);
+    entries.add(entry);
     await _storage.write(
       key: _key,
       value: jsonEncode(entries.map((item) => item.toJson()).toList()),
     );
+    return entry;
   }
 
   Future<void> remove(String id) async {
@@ -72,4 +81,12 @@ class OfflineCaptureQueue {
 
   Future<bool> get isOnline async => !(await _connectivity.checkConnectivity())
       .contains(ConnectivityResult.none);
+
+  String _uuid() {
+    final bytes = List<int>.generate(16, (_) => Random.secure().nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((value) => value.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+  }
 }

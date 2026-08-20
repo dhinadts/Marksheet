@@ -21,6 +21,7 @@ enum VersionStatus {
 }
 
 enum MarkSheetStatus {
+  PENDING_UPLOAD
   UPLOADED
   PROCESSING
   REVIEW_REQUIRED
@@ -96,6 +97,13 @@ enum FilePurpose {
   QUESTION_CROP
   EXPORT
   MODEL_ARTIFACT
+}
+
+enum UploadStatus {
+  PENDING
+  COMPLETED
+  EXPIRED
+  FAILED
 }
 
 enum ExportFormat {
@@ -684,7 +692,8 @@ model MarkSheet {
   questionPaperVersionId String                @map("question_paper_version_id") @db.Uuid
   markingSchemeVersionId String                @map("marking_scheme_version_id") @db.Uuid
   attempt                Int                   @default(1)
-  status                 MarkSheetStatus       @default(UPLOADED)
+  status                 MarkSheetStatus       @default(PENDING_UPLOAD)
+  clientRequestId        String                @map("client_request_id") @db.Uuid
   handwrittenTotal       Decimal?              @map("handwritten_total") @db.Decimal(7, 2)
   lockVersion            Int                   @default(0) @map("lock_version")
   createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -701,6 +710,7 @@ model MarkSheet {
   processingJobs         ProcessingJob[]
 
   @@unique([tenantId, studentId, subjectOfferingId, questionPaperVersionId, attempt])
+  @@unique([tenantId, clientRequestId])
   @@index([tenantId, status])
   @@map("mark_sheets")
 }
@@ -714,6 +724,9 @@ model FileObject {
   mimeType        String           @map("mime_type") @db.VarChar(150)
   sizeBytes       BigInt           @map("size_bytes")
   checksumSha256  String           @map("checksum_sha256") @db.Char(64)
+  uploadStatus    UploadStatus     @default(PENDING) @map("upload_status")
+  uploadExpiresAt DateTime         @map("upload_expires_at") @db.Timestamptz(6)
+  uploadedAt      DateTime?        @map("uploaded_at") @db.Timestamptz(6)
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   markSheetImages MarkSheetImage[]

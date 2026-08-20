@@ -1,18 +1,20 @@
 import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'image_quality.dart';
 import 'offline_capture_queue.dart';
+import '../../providers/providers.dart';
 
-class CaptureScreen extends StatefulWidget {
+class CaptureScreen extends ConsumerStatefulWidget {
   const CaptureScreen({super.key, required this.selection});
   final Map<String, String> selection;
   @override
-  State<CaptureScreen> createState() => _CaptureScreenState();
+  ConsumerState<CaptureScreen> createState() => _CaptureScreenState();
 }
 
-class _CaptureScreenState extends State<CaptureScreen>
+class _CaptureScreenState extends ConsumerState<CaptureScreen>
     with WidgetsBindingObserver {
   CameraController? controller;
   List<CameraDescription> cameras = const [];
@@ -103,14 +105,26 @@ class _CaptureScreenState extends State<CaptureScreen>
   }
 
   Future<void> _queue() async {
-    await OfflineCaptureQueue().enqueue(captured!.path, widget.selection);
+    final queue = OfflineCaptureQueue();
+    final entry = await queue.enqueue(captured!.path, widget.selection);
+    var uploaded = false;
+    if (await queue.isOnline) {
+      try {
+        await ref.read(uploadRepositoryProvider).upload(imagePath: entry.imagePath, context: entry.context, clientRequestId: entry.id);
+        await queue.remove(entry.id);
+        await File(entry.imagePath).delete();
+        uploaded = true;
+      } catch (_) {
+        uploaded = false;
+      }
+    }
     if (!mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (_) => const AlertDialog(
-        title: Text('Capture added to device queue'),
+      builder: (_) => AlertDialog(
+        title: Text(uploaded ? 'Upload complete' : 'Capture added to device queue'),
         content: Text(
-          'The validated capture is queued locally. Phase 8 will synchronize it through signed upload APIs.',
+          uploaded ? 'The image was verified by the server and is ready for processing.' : 'The durable local copy remains safely queued on this device.',
         ),
       ),
     );

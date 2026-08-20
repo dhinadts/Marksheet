@@ -13,6 +13,7 @@ import { TenantContextInterceptor } from './database/tenant-context.interceptor'
 import { CatalogModule } from './catalog/catalog.module';
 import { QuestionPapersModule } from './question-papers/question-papers.module';
 import { MarkingSchemesModule } from './marking-schemes/marking-schemes.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { MarkingSchemesModule } from './marking-schemes/marking-schemes.module';
     CatalogModule,
     QuestionPapersModule,
     MarkingSchemesModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [

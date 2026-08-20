@@ -17,7 +17,10 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
     ('departments', 'Department'),
     ('academic-years', 'Academic year'),
     ('classes', 'Class'),
+    ('sections', 'Section'),
+    ('students', 'Student'),
     ('subjects', 'Subject'),
+    ('subject-offerings', 'Subject offering'),
   ];
   final selected = <String, CatalogItem>{};
   int index = 0;
@@ -41,8 +44,20 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
       1: ('universityId', 'University'),
       2: ('collegeId', 'College'),
       4: ('academicYearId', 'Academic year'),
-      5: ('departmentId', 'Department'),
+      5: ('classId', 'Class'),
+      6: ('sectionId', 'Section'),
+      7: ('departmentId', 'Department'),
     };
+    if (index == 8) {
+      return rows
+          .where(
+            (item) =>
+                item.raw['sectionId'] == selected['Section']?.id &&
+                item.raw['subjectId'] == selected['Subject']?.id &&
+                item.raw['academicYearId'] == selected['Academic year']?.id,
+          )
+          .toList();
+    }
     final parent = parentFields[index];
     return parent == null
         ? rows
