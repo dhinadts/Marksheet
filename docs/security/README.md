@@ -38,3 +38,11 @@ Phase 16 export records, source queries, files, and status lookups are tenant-sc
 `export.create` is required, unverified scopes are rejected atomically, generated files
 are SHA-256 checksummed in private object storage, and downloads use short-lived signed
 URLs. Request, completion, and failure transitions are audit logged.
+# Phase 17 security baseline
+
+Production startup fails closed when database, Redis, JWT, internal AI, object-storage,
+or CORS settings are absent. Wildcard CORS, short JWT secrets, and development database
+placeholders are rejected. Helmet headers, rate limiting, DTO whitelisting, password
+hashing, refresh-token rotation, permission guards, private signed storage, audit history,
+and tenant-scoped queries form the application baseline. Secrets must be injected from a
+managed secret store and never committed.
