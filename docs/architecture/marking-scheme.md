@@ -11,11 +11,11 @@ questions and parts. Draft creation and publication validate complete question c
 question/part ownership, group membership, parent-child totals, the derived paper total,
 and administrator-defined confidence thresholds.
 
-| Questions | Maximum per question | Group maximum |
-| --- | ---: | ---: |
-| Q1–Q10 | 2 | 20 |
-| Q11–Q15 | 13 | 65 |
-| Q16 | 15 | 15 |
-| **Paper total** |  | **100** |
+| Questions       | Maximum per question | Group maximum |
+| --------------- | -------------------: | ------------: |
+| Q1–Q10          |                    2 |            20 |
+| Q11–Q15         |                   13 |            65 |
+| Q16             |                   15 |            15 |
+| **Paper total** |                      |       **100** |
 
 Q11–Q16 may have any number of parts. The administrator assigns maximum marks to those parts, and validation ensures their configured aggregate agrees with the parent question maximum. The engine reads this configuration to validate individual marks and calculate totals; it never infers limits from question numbers.

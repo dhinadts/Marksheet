@@ -23,4 +23,4 @@ def test_readiness_requires_internal_auth_configuration() -> None:
     assert unavailable.json()["status"] == "not_ready"
     assert available.status_code == 200
     assert available.json()["status"] == "ready"
-    assert all(not item["available"] for item in available.json()["capabilities"])
+    assert all(item["available"] for item in available.json()["capabilities"])

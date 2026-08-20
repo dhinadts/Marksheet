@@ -62,6 +62,16 @@ services:
       AI_ENVIRONMENT: ${AI_ENVIRONMENT:-development}
       AI_LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
       AI_MAX_IMAGE_BYTES: ${AI_MAX_IMAGE_BYTES:-26214400}
+      AI_MODEL_PATH: ${AI_MODEL_PATH:-}
+      AI_MODEL_CHECKSUM_SHA256: ${AI_MODEL_CHECKSUM_SHA256:-}
+      AI_MODEL_LABELS: ${AI_MODEL_LABELS:-0,1,2,3,4,5,6,7,8,9}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
+      AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-false}
     healthcheck:
       test:
         [
@@ -73,6 +83,29 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  ai-worker:
+    profiles: ["ai-processing"]
+    build:
+      context: ./ai-service
+    command: ["python", "-m", "app.worker"]
+    environment:
+      AI_INTERNAL_API_KEY: ${AI_INTERNAL_API_KEY:-}
+      AI_LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
+      AI_MAX_IMAGE_BYTES: ${AI_MAX_IMAGE_BYTES:-26214400}
+      AI_MODEL_PATH: ${AI_MODEL_PATH:-}
+      AI_MODEL_CHECKSUM_SHA256: ${AI_MODEL_CHECKSUM_SHA256:-}
+      AI_MODEL_LABELS: ${AI_MODEL_LABELS:-0,1,2,3,4,5,6,7,8,9}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
+      AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-false}
+    depends_on:
+      redis:
+        condition: service_healthy
 
   postgres:
     build:

@@ -2,7 +2,7 @@
 
 AI Examination Marks Digitization & Valuation System is a multi-tenant SaaS platform for capturing examination mark sheets, extracting individual handwritten marks, validating them, and completing human-controlled verification and export workflows.
 
-This repository contains the foundations through **Phase 9**: monorepo setup,
+This repository contains the foundations through **Phase 12**: monorepo setup,
 PostgreSQL/Prisma, authentication and RBAC, tenant-scoped master data, and
 student/subject/question-paper management, plus administrator-managed marking-scheme
 authoring and validation. OCR and production workflows belong to later phases and are
@@ -12,10 +12,11 @@ The Flutter client provides secure login, data-driven academic/paper selection, 
 camera capture, local image-quality preflight, durable offline queueing, and verified
 direct-to-object-storage upload. OCR and mark extraction remain later-phase work.
 
-The Phase 9 FastAPI service exposes a strict authenticated internal API contract,
-liveness/readiness checks, capability reporting, correlation IDs, and tenant-scoped object
-references. Image-processing routes explicitly remain unavailable until their owning phase,
-so no prototype behavior is represented as production inference.
+The FastAPI service now provides configurable image-quality checks, document/perspective
+correction, deskewing, contrast enhancement, versioned normalized template-cell extraction,
+checksummed ONNX model loading, per-mark confidence/range validation, and a Redis-backed
+asynchronous worker boundary. AI values remain advisory and always require the authorized
+NestJS verification workflow before they can become final marks.
 
 ## Applications
 

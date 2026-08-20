@@ -9,11 +9,11 @@ class Capability:
 
 
 CAPABILITIES = (
-    Capability("quality_check", False, 10),
-    Capability("preprocess", False, 10),
-    Capability("template_detection", False, 11),
-    Capability("cell_detection", False, 11),
-    Capability("handwriting_recognition", False, 12),
-    Capability("mark_validation", False, 12),
-    Capability("mark_sheet_processing", False, 12),
+    Capability("quality_check", True, 10),
+    Capability("preprocess", True, 10),
+    Capability("template_detection", True, 11),
+    Capability("cell_detection", True, 11),
+    Capability("handwriting_recognition", True, 12),
+    Capability("mark_validation", True, 12),
+    Capability("mark_sheet_processing", True, 12),
 )

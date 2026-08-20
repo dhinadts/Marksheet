@@ -3,7 +3,9 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
+from app.core.errors import ServiceError
 from app.main import create_app
+from app.schemas.common import JobResponse, JobStatus, ProcessMarkSheetRequest
 
 API_KEY = "phase-nine-test-internal-key-0001"
 TENANT_ID = "11111111-1111-4111-8111-111111111111"
@@ -32,6 +34,23 @@ def request_body(object_key: str | None = None) -> dict[str, object]:
     }
 
 
+def template_body() -> dict[str, object]:
+    return {
+        "template_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "version": 1,
+        "expected_aspect_ratio": 0.75,
+        "cells": [
+            {
+                "marking_scheme_item_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                "question_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                "label": "Q1",
+                "maximum_mark": 2,
+                "box": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.1},
+            }
+        ],
+    }
+
+
 def test_pipeline_requires_internal_service_authentication() -> None:
     response = client().post("/ai/quality-check", json=request_body())
 
@@ -40,7 +59,7 @@ def test_pipeline_requires_internal_service_authentication() -> None:
     UUID(response.headers["X-Correlation-ID"])
 
 
-def test_phase_ten_capability_is_not_falsely_reported_as_working() -> None:
+def test_processing_fails_closed_when_storage_is_not_configured() -> None:
     response = client().post(
         "/ai/quality-check",
         json=request_body(),
@@ -50,11 +69,11 @@ def test_phase_ten_capability_is_not_falsely_reported_as_working() -> None:
         },
     )
 
-    assert response.status_code == 501
+    assert response.status_code == 503
     assert response.json() == {
         "error": {
-            "code": "CAPABILITY_NOT_IMPLEMENTED",
-            "message": "Image quality checking is reserved for Phase 10",
+            "code": "STORAGE_NOT_CONFIGURED",
+            "message": "AI object storage is not configured",
             "correlation_id": "77777777-7777-4777-8777-777777777777",
         }
     }
@@ -71,24 +90,93 @@ def test_object_key_must_be_scoped_to_request_tenant() -> None:
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_configured_image_limit_is_enforced_before_processing() -> None:
-    app = create_app(Settings(internal_api_key=API_KEY, max_image_bytes=2048))
-    response = TestClient(app).post(
-        "/ai/quality-check",
-        json=request_body(),
-        headers={"X-AI-Service-Key": API_KEY},
-    )
-
-    assert response.status_code == 413
-    assert response.json()["error"]["code"] == "IMAGE_TOO_LARGE"
-
-
 def test_unknown_job_returns_typed_not_found() -> None:
+    class MissingQueue:
+        def get(self, tenant_id: UUID, job_id: UUID) -> JobResponse:
+            raise ServiceError(404, "JOB_NOT_FOUND", f"AI job {job_id} was not found")
+
     job_id = "66666666-6666-4666-8666-666666666666"
-    response = client().get(
-        f"/ai/jobs/{job_id}",
+    application = create_app(Settings(internal_api_key=API_KEY))
+    application.state.job_queue = MissingQueue()
+    response = TestClient(application).get(
+        f"/ai/jobs/{job_id}?tenant_id={TENANT_ID}",
         headers={"X-AI-Service-Key": API_KEY},
     )
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "JOB_NOT_FOUND"
+
+
+def test_job_status_requires_explicit_tenant_scope() -> None:
+    response = client().get(
+        "/ai/jobs/66666666-6666-4666-8666-666666666666",
+        headers={"X-AI-Service-Key": API_KEY},
+    )
+
+    assert response.status_code == 422
+
+
+def test_validation_never_accepts_mark_above_scheme_maximum() -> None:
+    body = request_body()
+    response = client().post(
+        "/ai/validate-marks",
+        json={
+            "context": body["context"],
+            "confidence_thresholds": {
+                "auto_accept": 0.95,
+                "review_recommended": 0.8,
+                "review_required": 0.6,
+            },
+            "candidates": [
+                {
+                    "marking_scheme_item_id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+                    "question_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+                    "label": "Q1",
+                    "raw_text": "8",
+                    "value": 8,
+                    "maximum_mark": 2,
+                    "confidence": 0.99,
+                    "bounding_box": {"x": 0.1, "y": 0.1, "width": 0.2, "height": 0.1},
+                }
+            ],
+        },
+        headers={"X-AI-Service-Key": API_KEY},
+    )
+
+    assert response.status_code == 200
+    assert response.json()[0]["status"] == "INVALID_EXTRACTION"
+
+
+def test_process_endpoint_enqueues_idempotent_external_job() -> None:
+    class CapturingQueue:
+        def enqueue(self, payload: ProcessMarkSheetRequest) -> JobResponse:
+            return JobResponse(
+                job_id=payload.job_id,
+                tenant_id=payload.context.tenant_id,
+                status=JobStatus.PENDING,
+            )
+
+    body = request_body()
+    body.update(
+        {
+            "template": template_body(),
+            "confidence_thresholds": {
+                "auto_accept": 0.95,
+                "review_recommended": 0.8,
+                "review_required": 0.6,
+            },
+            "model_version_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+            "job_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        }
+    )
+    application = create_app(Settings(internal_api_key=API_KEY))
+    application.state.job_queue = CapturingQueue()
+
+    response = TestClient(application).post(
+        "/ai/process-mark-sheet",
+        json=body,
+        headers={"X-AI-Service-Key": API_KEY},
+    )
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "PENDING"

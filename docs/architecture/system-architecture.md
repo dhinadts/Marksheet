@@ -18,5 +18,7 @@ The NestJS API is the business authority. AI output is advisory and cannot final
 
 ## Phase boundary
 
-Phase 9 establishes the typed and authenticated Python service boundary. Image preprocessing,
-cell detection, handwriting recognition, and queue-driven orchestration remain Phases 10–12.
+Phases 10–12 implement image preprocessing, configurable normalized template cells,
+checksummed ONNX inference, and a tenant-scoped Redis Stream worker. The Python service
+returns advisory per-mark results only. NestJS remains the sole database writer and must
+validate, audit, and authorize every later correction or finalization.

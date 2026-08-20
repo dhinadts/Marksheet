@@ -1,6 +1,7 @@
 # User guides
 
 Administrator, reviewer, and capture workflows will be documented alongside their implementation.
+
 # Flutter capture workflow
 
 1. Sign in with the tenant UUID and assigned account. Access and rotating refresh tokens
