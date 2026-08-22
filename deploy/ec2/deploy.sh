@@ -15,6 +15,17 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+database_url=$(grep '^DATABASE_URL=' .env | cut -d= -f2- || true)
+if [[ -z "$database_url" ]]; then
+  echo "DATABASE_URL is missing from .env." >&2
+  exit 1
+fi
+if [[ "$database_url" =~ @(localhost|127\.0\.0\.1): ]]; then
+  database_url=$(printf '%s' "$database_url" | sed -E 's/@(localhost|127\.0\.0\.1):/@postgres:/')
+  export DATABASE_URL="$database_url"
+  echo "Updated DATABASE_URL to use the Docker PostgreSQL service."
+fi
+
 echo "Starting PostgreSQL, Redis and AI service..."
 
 docker compose up -d --build postgres redis ai-service
@@ -53,16 +64,31 @@ else
   echo "Database university_marksheets already exists."
 fi
 
-echo "Starting backend and frontend..."
+echo "Starting backend..."
 
-docker compose up -d --build backend frontend
+docker compose up -d --build backend
 
-echo "Waiting briefly for backend container..."
-sleep 5
+echo "Waiting for backend to become healthy..."
+for i in {1..30}; do
+  if docker compose ps --status running --services | grep -qx backend && \
+    docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps -q backend)" | grep -qx healthy; then
+    echo "Backend is healthy."
+    break
+  fi
 
-echo "Running Prisma migrations..."
+  if [[ "$i" -eq 30 ]]; then
+    echo "Backend did not become healthy in time." >&2
+    docker compose logs --tail=100 backend
+    exit 1
+  fi
 
-docker compose exec -T backend npx prisma migrate deploy
+  echo "Waiting for backend... attempt $i/30"
+  sleep 2
+done
+
+echo "Starting frontend..."
+
+docker compose up -d --build frontend
 
 echo "Checking backend..."
 
@@ -70,8 +96,6 @@ curl --fail \
   --retry 20 \
   --retry-delay 3 \
   http://127.0.0.1:3001/ >/dev/null
-
-echo "Backend healthy."
 
 echo "Checking frontend..."
 
