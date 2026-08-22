@@ -69,10 +69,10 @@ Open `.env` in a text editor. At minimum, replace these values:
 ```env
 NODE_ENV=development
 
-POSTGRES_DB=ai_marks
+POSTGRES_DB=university_Marksheets
 POSTGRES_USER=ai_marks
 POSTGRES_PASSWORD=choose-a-long-local-database-password
-DATABASE_URL=postgresql://ai_marks:choose-a-long-local-database-password@postgres:5432/ai_marks?schema=public
+DATABASE_URL=postgresql://ai_marks:choose-a-long-local-database-password@postgres:5432/university_Marksheets?schema=public
 
 JWT_SECRET=replace-with-a-random-secret-at-least-32-characters-long
 AI_INTERNAL_API_KEY=replace-with-another-long-random-secret
@@ -302,8 +302,8 @@ In AWS EC2:
    | Port | Source | Purpose |
    | --- | --- | --- |
    | 22 | Your public IP only | SSH |
-   | 3000 | Your trusted IP range initially | Web application |
-   | 3001 | Your trusted IP range initially | API and Swagger |
+   | 80 | Anywhere | HTTP used for certificate setup and redirect |
+   | 443 | Anywhere | HTTPS web application and API |
 
 Do not expose PostgreSQL `5432`, Redis `6379`, or AI port `8000` publicly. For a public
 production site, expose only ports 80/443 through Nginx or an AWS load balancer.
@@ -319,7 +319,7 @@ ssh -i your-key.pem ubuntu@YOUR_EC2_PUBLIC_IP
 
 ```sh
 sudo apt update
-sudo apt install -y ca-certificates curl git
+sudo apt install -y ca-certificates curl git nginx certbot python3-certbot-nginx
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
@@ -342,19 +342,22 @@ docker compose version
 ```sh
 git clone https://github.com/dhinadts/Marksheet.git
 cd Marksheet
-cp .env.example .env
+cp deploy/ec2/env.example .env
 nano .env
 ```
 
-Use strong, unique production values. Replace `YOUR_EC2_PUBLIC_IP` below:
+Use strong, unique production values. The supplied example already binds all containers
+to localhost and configures `marksheet.dhinadts.com` for the web UI and
+`api.dhinadts.com` for the backend API:
 
 ```env
 NODE_ENV=production
+HOST_BIND_ADDRESS=127.0.0.1
 
-POSTGRES_DB=ai_marks
+POSTGRES_DB=university_Marksheets
 POSTGRES_USER=ai_marks
 POSTGRES_PASSWORD=REPLACE_WITH_A_LONG_RANDOM_DATABASE_PASSWORD
-DATABASE_URL=postgresql://ai_marks:REPLACE_WITH_THE_SAME_PASSWORD@postgres:5432/ai_marks?schema=public
+DATABASE_URL=postgresql://ai_marks:REPLACE_WITH_THE_SAME_PASSWORD@postgres:5432/university_Marksheets?schema=public
 REDIS_URL=redis://redis:6379
 
 JWT_SECRET=REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS
@@ -363,8 +366,8 @@ JWT_ACCESS_TTL_SECONDS=900
 JWT_REFRESH_TTL_SECONDS=2592000
 AUTH_MAX_FAILED_ATTEMPTS=5
 
-CORS_ORIGINS=http://YOUR_EC2_PUBLIC_IP:3000
-NEXT_PUBLIC_API_URL=http://YOUR_EC2_PUBLIC_IP:3001
+CORS_ORIGINS=https://marksheet.dhinadts.com
+NEXT_PUBLIC_API_URL=https://api.dhinadts.com
 AI_SERVICE_URL=http://ai-service:8000
 AI_ENVIRONMENT=production
 
@@ -379,7 +382,7 @@ SEED_ADMIN_EMAIL=admin@your-domain.example
 SEED_ADMIN_PASSWORD=REPLACE_WITH_A_STRONG_ADMIN_PASSWORD
 ```
 
-Update the S3 CORS `AllowedOrigins` value to `http://YOUR_EC2_PUBLIC_IP:3000`. Do not use
+Update the S3 CORS `AllowedOrigins` value to `https://marksheet.dhinadts.com`. Do not use
 `*` for production CORS.
 
 Protect the environment file:
@@ -388,10 +391,21 @@ Protect the environment file:
 chmod 600 .env
 ```
 
+Before starting, create DNS `A` records for both domains pointing to the EC2 Elastic IP.
+Install the included Nginx configuration:
+
+```sh
+sudo cp deploy/ec2/ai-marks.nginx.conf /etc/nginx/sites-available/ai-marks
+sudo ln -s /etc/nginx/sites-available/ai-marks /etc/nginx/sites-enabled/ai-marks
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
 ### 5. Start, seed, and verify
 
 ```sh
-docker compose up -d --build
+chmod +x deploy/ec2/deploy.sh
+./deploy/ec2/deploy.sh
 docker compose ps
 docker compose exec backend npm run db:seed
 curl http://localhost:3001/
@@ -399,10 +413,18 @@ curl http://localhost:8000/health
 curl -I http://localhost:3000/
 ```
 
+The deployment script creates `university_Marksheets` if it does not exist, applies
+committed migrations, and checks the UI and API. It does not delete or replace an
+existing database. Then enable HTTPS:
+
+```sh
+sudo certbot --nginx -d marksheet.dhinadts.com -d api.dhinadts.com
+```
+
 From your own computer, open:
 
-- `http://YOUR_EC2_PUBLIC_IP:3000`
-- `http://YOUR_EC2_PUBLIC_IP:3001/api/docs`
+- `https://marksheet.dhinadts.com`
+- `https://api.dhinadts.com/api/docs`
 
 Follow the earlier Swagger login instructions using the seeded tenant ID and production
 administrator credentials.
@@ -424,7 +446,7 @@ Take a database backup before migrations or major releases. Then:
 ```sh
 cd ~/Marksheet
 git pull --ff-only origin main
-docker compose up -d --build
+./deploy/ec2/deploy.sh
 docker compose ps
 docker compose logs --tail=100 backend
 ```
@@ -438,21 +460,19 @@ Create a backup directory and dump PostgreSQL:
 
 ```sh
 mkdir -p ~/ai-marks-backups
-docker compose exec -T postgres pg_dump -U ai_marks -d ai_marks -Fc > ~/ai-marks-backups/ai_marks_$(date +%F_%H%M).dump
+docker compose exec -T postgres pg_dump -U ai_marks -d university_Marksheets -Fc > ~/ai-marks-backups/university_Marksheets_$(date +%F_%H%M).dump
 ```
 
 Copy backups to encrypted S3 and test restoration regularly. A database backup does not
 replace S3 object versioning; both database records and mark-sheet files are required.
 
-### 9. HTTPS recommendation
+### 9. HTTPS and domain mapping
 
-Do not expose a real examination system permanently over plain HTTP. Use an AWS
-Application Load Balancer with ACM, or install Nginx and obtain a TLS certificate for a
-domain. After HTTPS is available, rebuild with:
+The included Nginx and Certbot steps terminate HTTPS with this mapping:
 
 ```env
-CORS_ORIGINS=https://marks.your-domain.example
-NEXT_PUBLIC_API_URL=https://api.marks.your-domain.example
+CORS_ORIGINS=https://marksheet.dhinadts.com
+NEXT_PUBLIC_API_URL=https://api.dhinadts.com
 ```
 
 Only ports 80/443 should remain publicly accessible after the reverse proxy is working.
@@ -475,6 +495,17 @@ docker compose logs --tail=200 backend
 
 Check that `JWT_SECRET` is at least 32 characters, passwords match, required AWS settings
 exist in production, and `DATABASE_URL` contains the Docker hostname `postgres`.
+
+If the log shows Prisma `P1000`, PostgreSQL was previously initialized with credentials
+different from `.env`. Docker does not change an existing database user's password when
+`POSTGRES_PASSWORD` changes. Preserve the data by restoring the original password in both
+`POSTGRES_PASSWORD` and `DATABASE_URL`. Only when the local data is disposable, use the
+reset procedure below to initialize `university_Marksheets` with the new credentials.
+
+If Docker reports that port `5432` is already in use, another PostgreSQL installation is
+running on the host. Either stop that instance or set `POSTGRES_HOST_PORT=5433` in `.env`.
+Containers still connect internally to `postgres:5432`; do not change the Compose
+`DATABASE_URL` port.
 
 ### Frontend calls localhost on EC2
 

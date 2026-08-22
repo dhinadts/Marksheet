@@ -12,6 +12,9 @@ import { ReportsService } from './reports.service';
 @RequirePermissions('report.read')
 export class ReportsController {
   constructor(private readonly service: ReportsService) {}
+  @Get('navigation') navigation(@CurrentUser() actor: AccessClaims) {
+    return this.service.navigation(actor);
+  }
   @Get('summary') summary(
     @Query() query: ReportQueryDto,
     @CurrentUser() actor: AccessClaims,

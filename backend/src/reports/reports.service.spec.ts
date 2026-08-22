@@ -30,6 +30,49 @@ describe('ReportsService tenant isolation', () => {
       }),
     );
   });
+  it('groups navigation by department and year inside the tenant', async () => {
+    const tx = {
+      academicClass: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            program: {
+              department: { id: 'department-1', code: 'CSE', name: 'CSE' },
+            },
+            studyYear: { id: 'year-1', displayName: 'I Year', ordinal: 1 },
+            sections: [{ _count: { students: 42 } }],
+          },
+        ]),
+      },
+    };
+    const tenant = {
+      transaction: jest.fn((_prisma, callback) => callback(tx)),
+    };
+    const service = new ReportsService(
+      {} as never,
+      tenant as never,
+      { get: jest.fn().mockReturnValue(10000) } as never,
+    );
+
+    await expect(service.navigation(actor)).resolves.toEqual([
+      {
+        id: 'department-1',
+        code: 'CSE',
+        name: 'CSE',
+        years: [
+          {
+            id: 'year-1',
+            name: 'I Year',
+            ordinal: 1,
+            students: 42,
+            classes: 1,
+          },
+        ],
+      },
+    ]);
+    expect(tx.academicClass.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: actor.tenantId } }),
+    );
+  });
   it('conceals a student outside the authenticated tenant', async () => {
     const tx = { student: { findFirst: jest.fn().mockResolvedValue(null) } };
     const tenant = {

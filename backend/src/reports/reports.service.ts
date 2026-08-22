@@ -51,6 +51,13 @@ const reportInclude = {
 type ReportSheet = Prisma.MarkSheetGetPayload<{
   include: typeof reportInclude;
 }>;
+type NavigationYear = {
+  id: string;
+  name: string;
+  ordinal: number;
+  students: number;
+  classes: number;
+};
 
 @Injectable()
 export class ReportsService {
@@ -85,6 +92,63 @@ export class ReportsService {
     });
   }
 
+  navigation(actor: AccessClaims) {
+    return this.tenant.transaction(this.prisma, async (tx) => {
+      const classes = await tx.academicClass.findMany({
+        where: { tenantId: actor.tenantId },
+        include: {
+          program: { include: { department: true } },
+          studyYear: true,
+          sections: {
+            where: { tenantId: actor.tenantId },
+            include: { _count: { select: { students: true } } },
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+      const departments = new Map<
+        string,
+        {
+          id: string;
+          code: string;
+          name: string;
+          years: Map<string, NavigationYear>;
+        }
+      >();
+      for (const academicClass of classes) {
+        const department = academicClass.program.department;
+        const entry = departments.get(department.id) ?? {
+          id: department.id,
+          code: department.code,
+          name: department.name,
+          years: new Map<string, NavigationYear>(),
+        };
+        const year = entry.years.get(academicClass.studyYear.id) ?? {
+          id: academicClass.studyYear.id,
+          name: academicClass.studyYear.displayName,
+          ordinal: academicClass.studyYear.ordinal,
+          students: 0,
+          classes: 0,
+        };
+        year.students += academicClass.sections.reduce(
+          (sum, section) => sum + section._count.students,
+          0,
+        );
+        year.classes += 1;
+        entry.years.set(year.id, year);
+        departments.set(entry.id, entry);
+      }
+      return [...departments.values()].map((department) => ({
+        id: department.id,
+        code: department.code,
+        name: department.name,
+        years: [...department.years.values()].sort(
+          (a, b) => a.ordinal - b.ordinal,
+        ),
+      }));
+    });
+  }
+
   classReport(query: ReportQueryDto, actor: AccessClaims) {
     return this.tenant.transaction(this.prisma, async (tx) => {
       const where = this.where(query, actor.tenantId);
@@ -92,28 +156,70 @@ export class ReportsService {
         tx.markSheet.count({ where }),
         tx.markSheet.findMany({
           where,
-          include: this.tenantReportInclude(actor.tenantId),
+          include: {
+            ...this.tenantReportInclude(actor.tenantId),
+            verificationSessions: {
+              where: {
+                tenantId: actor.tenantId,
+                status: VerificationSessionStatus.APPROVED,
+              },
+              orderBy: { completedAt: 'desc' },
+              take: 1,
+              include: {
+                items: {
+                  where: { tenantId: actor.tenantId },
+                  include: {
+                    selectedMarkValue: true,
+                    extractedMark: {
+                      include: {
+                        markingSchemeItem: {
+                          include: { question: true, questionPart: true },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
           orderBy: [{ student: { registerNumber: 'asc' } }, { attempt: 'asc' }],
           skip: (query.page - 1) * query.pageSize,
           take: query.pageSize,
         }),
       ]);
+      const data = sheets.map((sheet) => {
+        const calculation = sheet.calculationResults[0];
+        const marks = Object.fromEntries(
+          (sheet.verificationSessions[0]?.items ?? []).map((item) => {
+            const scheme = item.extractedMark.markingSchemeItem;
+            const question =
+              scheme.question?.label ?? `Item ${scheme.displayOrder}`;
+            return [
+              scheme.questionPart?.label
+                ? `${question}(${scheme.questionPart.label})`
+                : question,
+              item.selectedMarkValue?.value.toString() ?? null,
+            ];
+          }),
+        );
+        return {
+          markSheetId: sheet.id,
+          registerNumber: sheet.student.registerNumber,
+          studentName: sheet.student.fullName,
+          subject: sheet.subjectOffering.subject.name,
+          subjectCode: sheet.subjectOffering.subject.code,
+          questionPaperCode: sheet.questionPaperVersion.questionPaper.code,
+          marks,
+          attempt: sheet.attempt,
+          total: calculation?.grandTotal.toString() ?? null,
+          maximum: calculation?.maximumMark.toString() ?? null,
+          percentage: calculation?.percentage.toString() ?? null,
+          status: calculation?.status ?? sheet.status,
+        };
+      });
       return {
-        data: sheets.map((sheet) => {
-          const calculation = sheet.calculationResults[0];
-          return {
-            markSheetId: sheet.id,
-            registerNumber: sheet.student.registerNumber,
-            studentName: sheet.student.fullName,
-            subject: sheet.subjectOffering.subject.name,
-            subjectCode: sheet.subjectOffering.subject.code,
-            attempt: sheet.attempt,
-            total: calculation?.grandTotal.toString() ?? null,
-            maximum: calculation?.maximumMark.toString() ?? null,
-            percentage: calculation?.percentage.toString() ?? null,
-            status: calculation?.status ?? sheet.status,
-          };
-        }),
+        columns: [...new Set(data.flatMap((row) => Object.keys(row.marks)))],
+        data,
         meta: {
           page: query.page,
           pageSize: query.pageSize,
