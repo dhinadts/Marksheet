@@ -24,7 +24,7 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3001
 address for a physical device. To connect a physical device to the EC2 deployment, use:
 
 ```sh
-flutter run --dart-define=API_BASE_URL=http://3.6.211.24:3001
+flutter run --dart-define=API_BASE_URL=http://api.dhinadts.com
 ```
 
 The EC2 deployment must set `BACKEND_BIND_ADDRESS=0.0.0.0`, and its security group must
