@@ -37,15 +37,15 @@ DECLARE
   parent_version_id uuid;
   parent_question_id uuid;
   source_paper_version_id uuid;
-  question_paper_version_id uuid;
+  question_paper_version_id_value uuid;
 BEGIN
   SELECT "question_paper_version_id" INTO source_paper_version_id
   FROM "marking_scheme_versions"
   WHERE "id" = NEW."marking_scheme_version_id" AND "tenant_id" = NEW."tenant_id";
-  SELECT "question_paper_version_id" INTO question_paper_version_id
+  SELECT questions."question_paper_version_id" INTO question_paper_version_id_value
   FROM "questions"
   WHERE "id" = NEW."question_id" AND "tenant_id" = NEW."tenant_id";
-  IF source_paper_version_id IS DISTINCT FROM question_paper_version_id THEN
+  IF source_paper_version_id IS DISTINCT FROM question_paper_version_id_value THEN
     RAISE EXCEPTION 'scheme item question does not belong to its source paper version'
       USING ERRCODE = '23514';
   END IF;
