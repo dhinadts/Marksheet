@@ -99,10 +99,12 @@ curl --fail \
 
 echo "Checking frontend..."
 
+frontend_port=$(grep '^FRONTEND_PORT=' .env | cut -d= -f2- || true)
+frontend_port=${frontend_port:-3000}
 curl --fail \
   --retry 20 \
   --retry-delay 3 \
-  http://127.0.0.1:3000/ >/dev/null
+  "http://127.0.0.1:${frontend_port}/" >/dev/null
 
 echo "Frontend healthy."
 
