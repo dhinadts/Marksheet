@@ -1,5 +1,4 @@
 CREATE TYPE "UploadStatus" AS ENUM ('PENDING', 'COMPLETED', 'EXPIRED', 'FAILED');
-ALTER TYPE "MarkSheetStatus" ADD VALUE 'PENDING_UPLOAD' BEFORE 'UPLOADED';
 
 ALTER TABLE "mark_sheets"
   ADD COLUMN "client_request_id" UUID;
