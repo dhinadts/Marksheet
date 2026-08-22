@@ -14,9 +14,8 @@ describe('Authentication and authorization (e2e)', () => {
   let app: INestApplication<App>;
   const tenantId = '00000000-0000-4000-8000-000000000001';
   const credentials = {
-    tenantId,
-    email: process.env.SEED_ADMIN_EMAIL ?? 'admin@example.test',
-    password: process.env.SEED_ADMIN_PASSWORD ?? 'phase3-development-password',
+    username: 'prof01',
+    password: 'Qwerty@123',
   };
 
   beforeAll(async () => {
@@ -41,7 +40,7 @@ describe('Authentication and authorization (e2e)', () => {
       .post('/auth/login')
       .send({ ...credentials, password: 'incorrect-password' });
     expect(response.status).toBe(401);
-    expect(JSON.stringify(response.body)).not.toContain(credentials.email);
+    expect(JSON.stringify(response.body)).not.toContain(credentials.username);
   });
 
   it('logs in, reads the current user, rotates refresh tokens, and detects reuse', async () => {
@@ -58,7 +57,7 @@ describe('Authentication and authorization (e2e)', () => {
       .set('Authorization', `Bearer ${loginTokens.accessToken}`)
       .expect(200);
     const meBody = JSON.parse(me.text) as Record<string, unknown>;
-    expect(meBody).toMatchObject({ tenantId, email: credentials.email });
+    expect(meBody).toMatchObject({ tenantId, email: 'prof01@dhinadts.com' });
     expect(meBody.passwordHash).toBeUndefined();
 
     const rotated = await request(app.getHttpServer())
@@ -97,7 +96,7 @@ describe('Authentication and authorization (e2e)', () => {
   it('validates input and protects authenticated routes', async () => {
     await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ tenantId: 'bad', email: 'bad', password: 'short' })
+      .send({ username: 'x', password: 'short' })
       .expect(400);
     await request(app.getHttpServer()).get('/auth/me').expect(401);
   });

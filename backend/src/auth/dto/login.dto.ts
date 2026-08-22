@@ -1,17 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, IsUUID, MinLength } from 'class-validator';
+import { IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
-  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
-  tenantId!: string;
-
-  @ApiProperty({ example: 'admin@example.test' })
-  @IsEmail()
-  email!: string;
-
-  @ApiProperty({ minLength: 12, writeOnly: true })
+  @ApiProperty({ example: 'prof01' })
   @IsString()
-  @MinLength(12)
+  @MinLength(3)
+  username!: string;
+
+  @ApiProperty({ minLength: 8, writeOnly: true })
+  @IsString()
+  @MinLength(8)
   password!: string;
 }

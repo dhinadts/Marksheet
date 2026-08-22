@@ -180,42 +180,36 @@ async function seedAuthorization(tx: Prisma.TransactionClient): Promise<void> {
 async function seedDevelopmentUser(
   tx: Prisma.TransactionClient,
 ): Promise<void> {
-  const email = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
-  const password = process.env.SEED_ADMIN_PASSWORD;
-  if (!email || !password) return;
-  if (password.length < 12)
-    throw new Error('SEED_ADMIN_PASSWORD must contain at least 12 characters');
-  const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
-  const user = await tx.user.upsert({
-    where: { tenantId_email: { tenantId: ids.tenant, email } },
-    update: {
-      displayName: 'Demo Super Administrator',
-      passwordHash,
-      status: RecordStatus.ACTIVE,
-      failedLoginAttempts: 0,
-      lockedUntil: null,
-    },
-    create: {
-      tenantId: ids.tenant,
-      email,
-      displayName: 'Demo Super Administrator',
-      passwordHash,
-    },
-  });
   const role = await tx.role.findUniqueOrThrow({
-    where: { tenantId_code: { tenantId: ids.tenant, code: 'SUPER_ADMIN' } },
+    where: { tenantId_code: { tenantId: ids.tenant, code: 'VALUATOR' } },
   });
-  await tx.userRole.upsert({
-    where: {
-      tenantId_userId_roleId: {
-        tenantId: ids.tenant,
-        userId: user.id,
-        roleId: role.id,
+  const passwordHash = await argon2.hash('Qwerty@123', { type: argon2.argon2id });
+  for (let index = 1; index <= 10; index += 1) {
+    const username = `prof${index.toString().padStart(2, '0')}`;
+    const user = await tx.user.upsert({
+      where: { username },
+      update: {
+        email: `${username}@dhinadts.com`,
+        displayName: `Professor ${index.toString().padStart(2, '0')}`,
+        passwordHash,
+        status: RecordStatus.ACTIVE,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       },
-    },
-    update: {},
-    create: { tenantId: ids.tenant, userId: user.id, roleId: role.id },
-  });
+      create: {
+        tenantId: ids.tenant,
+        username,
+        email: `${username}@dhinadts.com`,
+        displayName: `Professor ${index.toString().padStart(2, '0')}`,
+        passwordHash,
+      },
+    });
+    await tx.userRole.upsert({
+      where: { tenantId_userId_roleId: { tenantId: ids.tenant, userId: user.id, roleId: role.id } },
+      update: {},
+      create: { tenantId: ids.tenant, userId: user.id, roleId: role.id },
+    });
+  }
 }
 
 async function seedAcademicStructure(

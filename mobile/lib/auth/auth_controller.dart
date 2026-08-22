@@ -1,14 +1,13 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/auth_tokens.dart';
 import '../providers/providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class AuthController extends AsyncNotifier<bool> {
   @override
   Future<bool> build() async =>
       (await ref.read(tokenStoreProvider).read()) != null;
   Future<void> login({
-    required String tenantId,
-    required String email,
+    required String username,
     required String password,
   }) async {
     state = const AsyncLoading();
@@ -19,8 +18,7 @@ class AuthController extends AsyncNotifier<bool> {
           .post<Map<String, dynamic>>(
             '/auth/login',
             data: {
-              'tenantId': tenantId.trim(),
-              'email': email.trim(),
+              'username': username.trim(),
               'password': password,
             },
           );

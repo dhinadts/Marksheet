@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -10,13 +10,11 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _form = GlobalKey<FormState>();
-  final tenant = TextEditingController();
-  final email = TextEditingController();
+  final username = TextEditingController();
   final password = TextEditingController();
   @override
   void dispose() {
-    tenant.dispose();
-    email.dispose();
+    username.dispose();
     password.dispose();
     super.dispose();
   }
@@ -57,15 +55,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: 32),
                     TextFormField(
-                      controller: tenant,
-                      decoration: const InputDecoration(labelText: 'Tenant ID'),
-                      validator: _required,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: email,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(labelText: 'Email'),
+                      controller: username,
+                      decoration: const InputDecoration(labelText: 'Username'),
                       validator: _required,
                     ),
                     const SizedBox(height: 12),
@@ -84,8 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ref
                                     .read(authControllerProvider.notifier)
                                     .login(
-                                      tenantId: tenant.text,
-                                      email: email.text,
+                                      username: username.text,
                                       password: password.text,
                                     );
                               }

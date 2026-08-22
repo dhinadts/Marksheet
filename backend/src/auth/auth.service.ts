@@ -38,9 +38,9 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, metadata: RequestMetadata): Promise<TokenPair> {
-    const email = dto.email.trim().toLowerCase();
+    const username = dto.username.trim().toLowerCase();
     const user = await this.prisma.user.findFirst({
-      where: { tenantId: dto.tenantId, email },
+      where: { username },
       include: {
         userRoles: {
           include: {

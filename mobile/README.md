@@ -30,6 +30,9 @@ flutter run --dart-define=API_BASE_URL=https://api.dhinadts.com
 The EC2 deployment must set `BACKEND_BIND_ADDRESS=0.0.0.0`, and its security group must
 allow TCP port `3001` only from the device or trusted network. Use HTTPS in production.
 
+The seeded professor accounts are `prof01` through `prof10`. Every account uses the
+password `Qwerty@123`; no tenant ID is required at login.
+
 ## Verification
 
 ```sh
