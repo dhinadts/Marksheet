@@ -90,6 +90,14 @@ echo "Starting frontend..."
 
 docker compose up -d --build frontend
 
+if command -v nginx >/dev/null 2>&1; then
+  echo "Enabling Marksheet Nginx site..."
+  sudo cp deploy/ec2/ai-marks.nginx.conf /etc/nginx/sites-available/ai-marks
+  sudo ln -sfn /etc/nginx/sites-available/ai-marks /etc/nginx/sites-enabled/ai-marks
+  sudo nginx -t
+  sudo systemctl reload nginx
+fi
+
 echo "Checking backend..."
 
 curl --fail \
