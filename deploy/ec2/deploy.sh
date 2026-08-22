@@ -3,6 +3,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+for required_file in backend/package.json backend/package-lock.json frontend/package.json frontend/package-lock.json; do
+  if [[ ! -f "$required_file" ]]; then
+    echo "Missing $required_file. Deploy from the repository root with its lockfiles included." >&2
+    exit 1
+  fi
+done
+
 if [[ ! -f .env ]]; then
   echo "Missing .env. Copy deploy/ec2/env.example to .env and replace every placeholder." >&2
   exit 1

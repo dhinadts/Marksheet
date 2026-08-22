@@ -34,6 +34,7 @@ __pycache__/
 .idea/
 .vscode/
 .git-generated/
+*.pem
 .DS_Store
 Thumbs.db
 
