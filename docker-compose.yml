@@ -40,7 +40,7 @@ services:
     restart: unless-stopped
     security_opt: ["no-new-privileges:true"]
     ports:
-      - "${HOST_BIND_ADDRESS:-0.0.0.0}:${BACKEND_PORT:-3001}:3001"
+      - "${BACKEND_BIND_ADDRESS:-${HOST_BIND_ADDRESS:-0.0.0.0}}:${BACKEND_PORT:-3001}:3001"
     depends_on:
       postgres:
         condition: service_healthy

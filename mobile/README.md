@@ -21,7 +21,14 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3001
 ```
 
 `10.0.2.2` reaches the host from an Android emulator. Use the development machine's LAN
-address for a physical device and HTTPS in deployed environments.
+address for a physical device. To connect a physical device to the EC2 deployment, use:
+
+```sh
+flutter run --dart-define=API_BASE_URL=http://3.6.211.24:3001
+```
+
+The EC2 deployment must set `BACKEND_BIND_ADDRESS=0.0.0.0`, and its security group must
+allow TCP port `3001` only from the device or trusted network. Use HTTPS in production.
 
 ## Verification
 
