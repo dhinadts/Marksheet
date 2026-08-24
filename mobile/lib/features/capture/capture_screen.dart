@@ -23,6 +23,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   ImageQualityResult? quality;
   bool busy = true;
   bool flash = false;
+  String? cameraError;
   @override
   void initState() {
     super.initState();
@@ -31,6 +32,10 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   }
 
   Future<void> _initialize() async {
+    setState(() {
+      busy = true;
+      cameraError = null;
+    });
     try {
       cameras = await availableCameras();
       if (cameras.isNotEmpty) {
@@ -41,6 +46,10 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
         );
         await controller!.initialize();
       }
+    } catch (error) {
+      cameraError = error is CameraException
+          ? (error.description ?? error.code)
+          : error.toString();
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -145,6 +154,33 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
             children: [
               if (controller?.value.isInitialized == true)
                 CameraPreview(controller!)
+              else if (!busy && cameraError != null)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.no_photography,
+                          color: Colors.white,
+                          size: 48,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Camera unavailable: $cameraError',
+                          style: const TextStyle(color: Colors.white),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: _initialize,
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
               else
                 const Center(
                   child: Icon(
