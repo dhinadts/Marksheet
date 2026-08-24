@@ -6,9 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('login screen exposes tenant-qualified credentials', (
-    tester,
-  ) async {
+  testWidgets('login screen exposes username credentials', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -19,8 +17,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('AI-MARKS'), findsOneWidget);
-    expect(find.text('Tenant ID'), findsOneWidget);
-    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Username'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
   });

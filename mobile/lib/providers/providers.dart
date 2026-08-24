@@ -7,7 +7,11 @@ import '../repositories/upload_repository.dart';
 
 final tokenStoreProvider = Provider((ref) => TokenStore());
 final apiClientProvider = Provider(
-  (ref) => ApiClient(ref.watch(tokenStoreProvider)),
+  (ref) => ApiClient(
+    ref.watch(tokenStoreProvider),
+    onSessionExpired: () =>
+        ref.read(authControllerProvider.notifier).sessionExpired(),
+  ),
 );
 final academicRepositoryProvider = Provider(
   (ref) => AcademicRepository(ref.watch(apiClientProvider).dio),

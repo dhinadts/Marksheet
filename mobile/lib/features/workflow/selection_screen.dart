@@ -79,7 +79,9 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
           return _Message(
             icon: Icons.cloud_off,
             text: 'Could not load data.\n${snapshot.error}',
-            action: () => setState(() => items = _load()),
+            action: () => setState(() {
+              items = _load();
+            }),
           );
         }
         final label = index == steps.length
@@ -90,7 +92,9 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
           return _Message(
             icon: Icons.inbox_outlined,
             text: 'No active $label records are available.',
-            action: () => setState(() => items = _load()),
+            action: () => setState(() {
+              items = _load();
+            }),
           );
         }
         return Column(

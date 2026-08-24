@@ -125,6 +125,7 @@ async function seedAuthorization(tx: Prisma.TransactionClient): Promise<void> {
       'report.read',
     ],
     VALUATOR: [
+      'master_data.read',
       'question_paper.read',
       'marking_scheme.read',
       'mark_sheet.read',

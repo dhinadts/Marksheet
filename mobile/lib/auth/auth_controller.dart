@@ -47,4 +47,8 @@ class AuthController extends AsyncNotifier<bool> {
     await ref.read(tokenStoreProvider).clear();
     state = const AsyncData(false);
   }
+
+  void sessionExpired() {
+    state = const AsyncData(false);
+  }
 }

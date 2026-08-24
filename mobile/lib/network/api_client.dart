@@ -4,7 +4,7 @@ import '../config/app_config.dart';
 import '../models/auth_tokens.dart';
 
 class ApiClient {
-  ApiClient(this._tokens, {Dio? dio})
+  ApiClient(this._tokens, {Dio? dio, this.onSessionExpired})
     : dio =
           dio ??
           Dio(
@@ -20,6 +20,7 @@ class ApiClient {
   }
   final TokenStore _tokens;
   final Dio dio;
+  final void Function()? onSessionExpired;
   bool _refreshing = false;
   Future<void> _authorize(
     RequestOptions options,
@@ -57,6 +58,7 @@ class ApiClient {
       handler.resolve(await dio.fetch<dynamic>(request));
     } catch (_) {
       await _tokens.clear();
+      onSessionExpired?.call();
       handler.next(error);
     } finally {
       _refreshing = false;
