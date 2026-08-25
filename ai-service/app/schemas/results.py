@@ -76,8 +76,33 @@ class ExtractedMarkResult(StrictModel):
     bounding_box: NormalizedBox
 
 
+class ExtractionQuality(StrictModel):
+    status: str
+    width: int
+    height: int
+    table_detected: bool
+    table_confidence: float = Field(ge=0, le=1)
+    warnings: list[str]
+
+
+class QuestionTotalValidation(StrictModel):
+    question: str
+    calculated_total: float | None
+    written_total: float | None
+    matches: bool | None
+
+
+class ExtractionValidation(StrictModel):
+    questions: list[QuestionTotalValidation]
+    calculated_grand_total: float | None
+    complete: bool
+    issues: list[str]
+
+
 class ExtractionResponse(StrictModel):
     model_version_id: UUID
     template_match: TemplateMatchResponse
     marks: list[ExtractedMarkResult]
+    quality: ExtractionQuality
+    validation: ExtractionValidation
     requires_human_review: bool = True

@@ -20,6 +20,9 @@ class Settings:
     model_checksum_sha256: str | None = None
     model_labels: tuple[str, ...] = tuple(str(value) for value in range(10))
     redis_url: str | None = None
+    marks_debug: bool = False
+    marks_min_confidence: float = 0.65
+    marks_auto_accept_confidence: float = 0.85
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -64,4 +67,9 @@ class Settings:
             model_checksum_sha256=checksum.lower() if checksum else None,
             model_labels=labels,
             redis_url=os.getenv("REDIS_URL") or None,
+            marks_debug=os.getenv("MARKS_DEBUG", "false").lower() == "true",
+            marks_min_confidence=float(os.getenv("MARKS_MIN_CONFIDENCE", "0.65")),
+            marks_auto_accept_confidence=float(
+                os.getenv("MARKS_AUTO_ACCEPT_CONFIDENCE", "0.85")
+            ),
         )

@@ -108,7 +108,22 @@ class _DetailState extends ConsumerState<CapturedSheetDetailScreen> {
                   defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                   children: [
                     _header(context),
-                    ...sheet.marks.map((mark) => _row(context, mark)),
+                    ..._sectionedRows(context, sheet.marks),
+                  ],
+                ),
+              ),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      title: const Text('Part A total'),
+                      trailing: Text(_format(sheet.partATotal)),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      title: const Text('Part B & C total'),
+                      trailing: Text(_format(sheet.partBCTotal)),
+                    ),
                   ],
                 ),
               ),
@@ -163,6 +178,37 @@ class _DetailState extends ConsumerState<CapturedSheetDetailScreen> {
       _Cell(_format(mark.maximum), centered: true),
     ],
   );
+
+  static Iterable<TableRow> _sectionedRows(
+    BuildContext context,
+    List<DisplayMark> marks,
+  ) sync* {
+    var section = '';
+    for (final mark in marks) {
+      final match = RegExp(
+        r'^(?:Question\s*|Q)(\d+)',
+        caseSensitive: false,
+      ).firstMatch(mark.label);
+      final number = match == null ? null : int.tryParse(match.group(1)!);
+      final nextSection = number != null && number <= 10
+          ? 'PART A'
+          : 'PART B & C';
+      if (nextSection != section) {
+        section = nextSection;
+        yield TableRow(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+          ),
+          children: [
+            _Cell(section, bold: true),
+            const _Cell(''),
+            const _Cell(''),
+          ],
+        );
+      }
+      yield _row(context, mark);
+    }
+  }
 }
 
 class _Cell extends StatelessWidget {

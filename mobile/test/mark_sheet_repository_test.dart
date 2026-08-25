@@ -31,5 +31,39 @@ void main() {
     expect(sheet.total, 3);
     expect(sheet.maximum, 4);
     expect(sheet.isComplete, isTrue);
+    expect(sheet.partATotal, 3);
+    expect(sheet.partBCTotal, 0);
   });
+
+  test(
+    'separates Part A and Part B/C totals from configured question labels',
+    () {
+      const marks = [
+        DisplayMark(
+          label: 'Q10',
+          value: 2,
+          maximum: 2,
+          status: 'AUTO_ACCEPT',
+          displayOrder: 1,
+        ),
+        DisplayMark(
+          label: 'Question 11',
+          value: 12,
+          maximum: 13,
+          status: 'REVIEW_REQUIRED',
+          displayOrder: 2,
+        ),
+      ];
+      const sheet = MarkSheetDetail(
+        status: 'REVIEW_REQUIRED',
+        student: '',
+        subject: '',
+        hierarchy: '',
+        marks: marks,
+      );
+
+      expect(sheet.partATotal, 2);
+      expect(sheet.partBCTotal, 12);
+    },
+  );
 }

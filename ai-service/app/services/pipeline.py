@@ -8,14 +8,17 @@ from app.schemas.results import (
     CellDetectionResponse,
     DetectedCell,
     ExtractedMarkResult,
+    ExtractionQuality,
     ExtractionResponse,
     PreprocessResponse,
     QualityResponse,
     TemplateMatchResponse,
 )
+from app.services.arithmetic import validate_arithmetic
 from app.services.preprocessing import ImageArray, ImagePreprocessor, PreprocessedImage
 from app.services.recognition import OnnxMarkRecognizer, Recognition, parse_mark
 from app.services.storage import ObjectStore
+from app.services.table_detection import MarksTableDetector
 from app.services.templates import CellCrop, TemplateDetector
 from app.services.validation import classify_extraction
 
@@ -34,12 +37,14 @@ class PipelineService:
         preprocessor: ImagePreprocessor | None = None,
         template_detector: TemplateDetector | None = None,
         recognizer: Recognition | None = None,
+        table_detector: MarksTableDetector | None = None,
     ) -> None:
         self._settings = settings
         self._storage = storage
         self._preprocessor = preprocessor or ImagePreprocessor()
         self._templates = template_detector or TemplateDetector()
         self._recognizer = recognizer
+        self._table_detector = table_detector or MarksTableDetector()
 
     def quality_check(self, request: StageRequest) -> QualityResponse:
         return self._preprocessor.quality(self._load(request))
@@ -82,6 +87,7 @@ class PipelineService:
             "image/png",
         )
         match = self._templates.match(prepared.processed.image, request.template)
+        table = self._table_detector.detect(prepared.processed.image)
         crops = self._templates.extract_cells(prepared.processed.image, request.template)
         recognizer = self._recognizer or OnnxMarkRecognizer(self._settings)
         marks: list[ExtractedMarkResult] = []
@@ -109,11 +115,25 @@ class PipelineService:
                     bounding_box=crop.definition.bounding_box,
                 )
             )
+        validation = validate_arithmetic(marks)
         return ExtractionResponse(
             model_version_id=request.model_version_id,
             template_match=match,
             marks=marks,
-            requires_human_review=True,
+            quality=ExtractionQuality(
+                status="accepted" if table.detected else "warning",
+                width=prepared.processed.image.shape[1],
+                height=prepared.processed.image.shape[0],
+                table_detected=table.detected,
+                table_confidence=round(table.confidence, 6),
+                warnings=[]
+                if table.detected
+                else ["Marks table grid was not detected reliably; template cells require review"],
+            ),
+            validation=validation,
+            requires_human_review=not all(
+                mark.status == "AUTO_ACCEPT" for mark in marks
+            ) or not validation.complete,
         )
 
     def _load(self, request: StageRequest) -> ImageArray:

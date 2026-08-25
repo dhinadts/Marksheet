@@ -53,6 +53,27 @@ class MarkSheetDetail {
       : (storedMaximum ?? 0);
   bool get isComplete =>
       marks.isNotEmpty && marks.every((mark) => mark.value != null);
+
+  double get partATotal => marks
+      .where((mark) {
+        final number = _questionNumber(mark.label);
+        return number != null && number <= 10;
+      })
+      .fold(0, (sum, mark) => sum + (mark.value ?? 0));
+  double get partBCTotal => marks
+      .where((mark) {
+        final number = _questionNumber(mark.label);
+        return number != null && number >= 11;
+      })
+      .fold(0, (sum, mark) => sum + (mark.value ?? 0));
+
+  static int? _questionNumber(String label) {
+    final match = RegExp(
+      r'^(?:Question\s*|Q)(\d+)',
+      caseSensitive: false,
+    ).firstMatch(label);
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
 }
 
 class MarkSheetRepository {

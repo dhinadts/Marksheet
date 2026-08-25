@@ -78,10 +78,13 @@ class OnnxMarkRecognizer:
         confidences: list[float] = []
         for x, y, box_width, box_height in boxes[:3]:
             pad = max(2, int(max(box_width, box_height) * 0.15))
-            digit = binary[
-                max(0, y - pad) : min(height, y + box_height + pad),
-                max(0, x - pad) : min(width, x + box_width + pad),
-            ]
+            digit = cast(
+                ImageArray,
+                binary[
+                    max(0, y - pad) : min(height, y + box_height + pad),
+                    max(0, x - pad) : min(width, x + box_width + pad),
+                ],
+            )
             label, confidence = self._recognize_digit(digit)
             digits.append(label)
             confidences.append(confidence)
