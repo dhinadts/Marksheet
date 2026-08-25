@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
-import { ReportsController } from './reports.controller';
+import {
+  ReportsController,
+  StudentPortalController,
+} from './reports.controller';
 import { ReportsService } from './reports.service';
 
 @Module({
-  controllers: [ReportsController],
+  controllers: [ReportsController, StudentPortalController],
   providers: [ReportsService],
   exports: [ReportsService],
 })

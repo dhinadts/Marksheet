@@ -3,6 +3,20 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+full_deploy=false
+deploy_backend=true
+deploy_frontend=true
+case "${1:-}" in
+  --full) full_deploy=true ;;
+  --backend-only) deploy_frontend=false ;;
+  --frontend-only) deploy_backend=false ;;
+  "") ;;
+  *)
+    echo "Usage: $0 [--full|--backend-only|--frontend-only]" >&2
+    exit 2
+    ;;
+esac
+
 for required_file in backend/package.json backend/package-lock.json frontend/package.json frontend/package-lock.json; do
   if [[ ! -f "$required_file" ]]; then
     echo "Missing $required_file. Deploy from the repository root with its lockfiles included." >&2
@@ -66,9 +80,13 @@ if [[ "$database_url" =~ @(localhost|127\.0\.0\.1): ]]; then
   echo "Updated and saved DATABASE_URL to use the Docker PostgreSQL service."
 fi
 
-echo "Starting PostgreSQL, Redis, AI service and persistent AI worker..."
-
-docker compose --profile ai-processing up -d --build postgres redis ai-service ai-worker
+if [[ "$full_deploy" == true ]]; then
+  echo "Full deployment: rebuilding PostgreSQL, Redis and AI services..."
+  docker compose --profile ai-processing up -d --build postgres redis ai-service ai-worker
+else
+  echo "Fast deployment: reusing PostgreSQL, Redis and AI images..."
+  docker compose --profile ai-processing up -d --no-build postgres redis ai-service ai-worker
+fi
 
 echo "Waiting for PostgreSQL to become ready..."
 
@@ -104,7 +122,8 @@ else
   echo "Database university_marksheets already exists."
 fi
 
-echo "Starting backend..."
+if [[ "$deploy_backend" == true ]]; then
+echo "Building backend only..."
 
 # Build only this image. `up --build backend` also rebuilds every dependency
 # (PostgreSQL, Redis and AI service) on some Compose versions.
@@ -128,13 +147,16 @@ for i in {1..30}; do
   echo "Waiting for backend... attempt $i/30"
   sleep 2
 done
+fi
 
-echo "Starting frontend..."
+if [[ "$deploy_frontend" == true ]]; then
+echo "Building frontend only..."
 
 # Next.js compilation can take several minutes on small EC2 instances. Keep the
 # output visible and do not rebuild backend or its dependencies a second time.
 docker compose --progress plain build frontend
 docker compose up -d --no-deps --force-recreate frontend
+fi
 
 if command -v nginx >/dev/null 2>&1; then
   echo "Enabling Marksheet Nginx site..."

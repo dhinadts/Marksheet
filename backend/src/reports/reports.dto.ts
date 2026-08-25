@@ -1,5 +1,19 @@
 import { Transform } from 'class-transformer';
-import { IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+
+export class StudentPortalDto {
+  @IsString() @MaxLength(80) registerNumber!: string;
+  @IsDateString() dateOfBirth!: string;
+}
 
 export class ReportQueryDto {
   @IsOptional() @IsUUID() universityId?: string;

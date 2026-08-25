@@ -1,9 +1,20 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { AccessClaims } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { RequirePermissions } from '../auth/decorators/permissions.decorator';
-import { ReportQueryDto } from './reports.dto';
+import { ReportQueryDto, StudentPortalDto } from './reports.dto';
 import { ReportsService } from './reports.service';
 
 @ApiTags('Reports')
@@ -33,5 +44,19 @@ export class ReportsController {
     @CurrentUser() actor: AccessClaims,
   ) {
     return this.service.studentReport(id, query, actor);
+  }
+}
+
+@ApiTags('Student portal')
+@Controller('student-portal')
+export class StudentPortalController {
+  constructor(private readonly service: ReportsService) {}
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('marks')
+  @HttpCode(200)
+  marks(@Body() dto: StudentPortalDto) {
+    return this.service.studentPortal(dto);
   }
 }

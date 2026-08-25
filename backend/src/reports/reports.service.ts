@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   BadRequestException,
   Injectable,
   NotFoundException,
@@ -13,7 +14,7 @@ import {
 import type { AccessClaims } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../database/tenant-context.service';
-import { ReportQueryDto } from './reports.dto';
+import { ReportQueryDto, StudentPortalDto } from './reports.dto';
 import { summarizeRows } from './report-projection';
 
 const reportInclude = {
@@ -66,6 +67,29 @@ export class ReportsService {
     private readonly tenant: TenantContextService,
     private readonly config: ConfigService,
   ) {}
+
+  async studentPortal(dto: StudentPortalDto) {
+    const students = await this.prisma.student.findMany({
+      where: {
+        registerNumber: dto.registerNumber.trim(),
+        dateOfBirth: new Date(dto.dateOfBirth),
+        status: 'ACTIVE',
+      },
+      select: { id: true, tenantId: true },
+      take: 2,
+    });
+    if (students.length !== 1)
+      throw new ForbiddenException('Roll number or date of birth is incorrect');
+    const student = students[0];
+    return this.studentReport(student.id, new ReportQueryDto(), {
+      sub: student.id,
+      tenantId: student.tenantId,
+      email: `student:${dto.registerNumber.trim()}`,
+      roles: ['student'],
+      permissions: [],
+      tokenVersion: 0,
+    });
+  }
 
   summary(query: ReportQueryDto, actor: AccessClaims) {
     return this.tenant.transaction(this.prisma, async (tx) => {

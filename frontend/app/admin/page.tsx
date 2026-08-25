@@ -8,7 +8,7 @@ type RecordItem = Record<string, string> & { id: string };
 type Page = { items: RecordItem[] };
 type Lists = Record<string, RecordItem[]>;
 
-const resources = ["academic-years", "departments", "department-academic-years", "programs", "sections", "students", "professors", "subject-offerings", "professor-subject-assignments"];
+const resources = ["universities", "colleges", "academic-years", "departments", "department-academic-years", "programs", "sections", "students", "subjects", "professors", "subject-offerings", "professor-subject-assignments"];
 
 export default function AdminPage() {
   const [lists, setLists] = useState<Lists>({});
@@ -38,6 +38,10 @@ export default function AdminPage() {
   const card = (title: string, resource: string, children: React.ReactNode) => <form onSubmit={(event) => void create(event, resource)} className="rounded-xl bg-white p-5 shadow-sm"><h2 className="mb-4 text-lg font-bold">{title}</h2><div className="grid gap-3">{children}<button disabled={busy} className="mt-2 rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50">Save</button></div></form>;
 
   return <main className="min-h-screen bg-slate-100 p-4 text-slate-900 lg:p-8"><header className="mx-auto mb-6 flex max-w-7xl items-center justify-between"><div><p className="text-sm font-semibold uppercase tracking-widest text-blue-700">ADMIN</p><h1 className="text-3xl font-bold">Academic administration</h1><p className="text-slate-600">Yearly departments, student roll numbers and professor subject access</p></div><Link href="/" className="font-semibold text-blue-700">Home</Link></header>{message && <p className="mx-auto mb-5 max-w-7xl rounded-lg bg-white p-3 shadow-sm">{message}</p>}<section className="mx-auto grid max-w-7xl gap-5 md:grid-cols-2 xl:grid-cols-3">
+    {card("University", "universities", <>{input("code", "University code")}{input("name", "University name")}</>)}
+    {card("College", "colleges", <>{select("universityId", "universities", "University")}{input("code", "College code")}{input("name", "College name")}</>)}
+    {card("Department", "departments", <>{select("collegeId", "colleges", "College")}{input("code", "Department code")}{input("name", "Department name")}</>)}
+    {card("Subject", "subjects", <>{select("departmentId", "departments", "Department")}{input("code", "Subject code")}{input("name", "Subject name")}</>)}
     {card("Academic year", "academic-years", <>{input("code", "Year code (example: 2026-27)")}{input("startsOn", "Start date", "date")}{input("endsOn", "End date", "date")}</>)}
     {card("Department for academic year", "department-academic-years", <>{select("departmentId", "departments", "Department")}{select("academicYearId", "academic-years", "Academic year")}</>)}
     {card("Student roll number", "students", <>{select("departmentId", "departments", "Department")}{select("programId", "programs", "Program")}{select("sectionId", "sections", "Section")}{input("registerNumber", "Roll / register number")}{input("fullName", "Student full name")}</>)}

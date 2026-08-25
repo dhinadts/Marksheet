@@ -12,6 +12,7 @@ import {
 export default function Home() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [markSheetId, setMarkSheetId] = useState("");
   const [error, setError] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -76,18 +77,19 @@ export default function Home() {
               placeholder="Username"
               className="w-full rounded-lg border border-slate-300 px-4 py-3"
             />
-            <input
+            <div className="relative"><input
               required
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Password"
-              className="w-full rounded-lg border border-slate-300 px-4 py-3"
-            />
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 pr-20"
+            /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute inset-y-0 right-3 text-sm font-semibold text-blue-700">{showPassword ? "Hide" : "Show"}</button></div>
             <button className="w-full rounded-lg bg-blue-700 px-5 py-3 font-semibold text-white">
               Sign in
             </button>
             {error && <p className="text-red-700">{error}</p>}
+            <p className="text-center text-sm text-slate-600">Student? <Link href="/student" className="font-semibold text-blue-700">View marks by roll number</Link></p>
           </form>
         ) : (
           <div className="mt-6">
