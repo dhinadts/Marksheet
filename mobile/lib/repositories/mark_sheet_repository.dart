@@ -41,10 +41,16 @@ class MarkSheetDetail {
   final double? storedMaximum;
   final int? calculationVersion;
 
-  double get total =>
-      storedTotal ?? marks.fold(0, (sum, mark) => sum + (mark.value ?? 0));
-  double get maximum =>
-      storedMaximum ?? marks.fold(0, (sum, mark) => sum + mark.maximum);
+  // The captured-sheet screen shows advisory AI values before verification.
+  // A persisted calculation can still be 0 at that point because no values
+  // have been selected by a reviewer, so derive both totals from the same
+  // question-wise marks displayed on screen whenever they are available.
+  double get total => marks.isNotEmpty
+      ? marks.fold(0, (sum, mark) => sum + (mark.value ?? 0))
+      : (storedTotal ?? 0);
+  double get maximum => marks.isNotEmpty
+      ? marks.fold(0, (sum, mark) => sum + mark.maximum)
+      : (storedMaximum ?? 0);
   bool get isComplete =>
       marks.isNotEmpty && marks.every((mark) => mark.value != null);
 }

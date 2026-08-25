@@ -197,14 +197,13 @@ export class MarkSheetsService {
         {
           sourceImageId: context.image.id,
           aiModelVersionId: context.model.id,
-        marks: result.marks.map((mark) => ({
+          marks: result.marks.map((mark) => ({
             markingSchemeItemId: mark.marking_scheme_item_id,
             rawText: mark.raw_text ?? undefined,
-          value:
-            mark.status === 'INVALID_EXTRACTION' ||
-            mark.status === 'MANUAL_ENTRY_REQUIRED'
-              ? undefined
-              : (mark.value ?? undefined),
+            // A review status describes confidence/validity; it must not erase
+            // the recognizer's numeric result. Reviewers still need to see the
+            // handwritten value in order to confirm or correct it.
+            value: mark.value ?? undefined,
             confidence: mark.confidence,
             status: mark.status as never,
             boundingBox: mark.bounding_box,
