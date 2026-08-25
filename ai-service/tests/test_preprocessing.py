@@ -42,9 +42,15 @@ def test_dark_blurred_low_resolution_image_requires_retake() -> None:
     assert {"LOW_RESOLUTION", "BLURRY", "TOO_DARK"}.issubset(result.reasons)
 
 
-def test_preprocess_returns_single_channel_enhanced_document() -> None:
-    result = ImagePreprocessor().preprocess(document_image())
+def test_preprocess_preserves_colour_for_form_line_filtering() -> None:
+    image = document_image()
+    cv2.line(image, (100, 300), (800, 300), (220, 140, 40), 5)
+    cv2.line(image, (100, 400), (800, 400), (40, 40, 220), 5)
 
-    assert result.image.ndim == 2
+    result = ImagePreprocessor().preprocess(image)
+
+    assert result.image.ndim == 3
+    assert result.image.shape[2] == 3
     assert result.image.dtype == np.uint8
     assert result.image.size > 0
+    assert np.any(result.image[:, :, 0] != result.image[:, :, 2])

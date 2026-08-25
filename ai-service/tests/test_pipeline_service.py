@@ -39,7 +39,10 @@ class MemoryStore:
 
 
 class FixedRecognizer:
+    last_image: ImageArray | None = None
+
     def recognize(self, image: ImageArray) -> tuple[str | None, float]:
+        self.last_image = image
         return "8", 0.99
 
 
@@ -88,11 +91,12 @@ def test_pipeline_preserves_individual_invalid_mark_for_human_review() -> None:
         ),
         model_version_id=UUID("99999999-9999-4999-8999-999999999999"),
     )
+    recognizer = FixedRecognizer()
     service = PipelineService(
         Settings(max_image_bytes=10_000_000),
         store,
         preprocessor=ImagePreprocessor(),
-        recognizer=FixedRecognizer(),
+        recognizer=recognizer,
     )
 
     result = service.extract_marks(request)
@@ -102,3 +106,5 @@ def test_pipeline_preserves_individual_invalid_mark_for_human_review() -> None:
     assert result.marks[0].value == 8
     assert result.marks[0].maximum_mark == 2
     assert result.marks[0].status == ExtractionStatus.INVALID_EXTRACTION
+    assert recognizer.last_image is not None
+    assert recognizer.last_image.ndim == 3

@@ -112,10 +112,16 @@ class ImagePreprocessor:
                 ImageArray,
                 cv2.warpAffine(working, matrix, (width, height), borderMode=cv2.BORDER_REPLICATE),
             )
-        gray = cast(ImageArray, cv2.cvtColor(working, cv2.COLOR_BGR2GRAY))
+        # Keep colour information for mark-cell recognition. The recognizer
+        # uses it to discard the form's blue grid and red correction ticks;
+        # returning grayscale here made those annotations indistinguishable
+        # from the examiner's dark handwriting. Enhance only luminance.
+        lab = cv2.cvtColor(working, cv2.COLOR_BGR2LAB)
+        luminance, channel_a, channel_b = cv2.split(lab)
+        luminance = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(luminance)
         enhanced = cast(
             ImageArray,
-            cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray),
+            cv2.cvtColor(cv2.merge((luminance, channel_a, channel_b)), cv2.COLOR_LAB2BGR),
         )
         return PreprocessedImage(enhanced, round(angle, 4), corrected)
 
