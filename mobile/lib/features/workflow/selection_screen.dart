@@ -66,80 +66,101 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
               .toList();
   }
 
+  void _previousStep() {
+    if (index == 0) {
+      context.pop();
+      return;
+    }
+    setState(() {
+      index--;
+      for (var step = index; step < steps.length; step++) {
+        selected.remove(steps[step].$2);
+      }
+      selected.remove('Question paper');
+      items = _load();
+    });
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Capture context')),
-    body: FutureBuilder<List<CatalogItem>>(
-      future: items,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return _Message(
-            icon: Icons.cloud_off,
-            text: 'Could not load data.\n${snapshot.error}',
-            action: () => setState(() {
-              items = _load();
-            }),
-          );
-        }
-        final label = index == steps.length
-            ? 'Question paper'
-            : steps[index].$2;
-        final rows = snapshot.data!;
-        if (rows.isEmpty) {
-          return _Message(
-            icon: Icons.inbox_outlined,
-            text: 'No active $label records are available.',
-            action: () => setState(() {
-              items = _load();
-            }),
-          );
-        }
-        return Column(
-          children: [
-            LinearProgressIndicator(value: (index + 1) / (steps.length + 1)),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Select $label',
-                  style: Theme.of(context).textTheme.headlineSmall,
+  Widget build(BuildContext context) => PopScope(
+    canPop: index == 0,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _previousStep();
+    },
+    child: Scaffold(
+      appBar: AppBar(title: const Text('Capture context')),
+      body: FutureBuilder<List<CatalogItem>>(
+        future: items,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return _Message(
+              icon: Icons.cloud_off,
+              text: 'Could not load data.\n${snapshot.error}',
+              action: () => setState(() {
+                items = _load();
+              }),
+            );
+          }
+          final label = index == steps.length
+              ? 'Question paper'
+              : steps[index].$2;
+          final rows = snapshot.data!;
+          if (rows.isEmpty) {
+            return _Message(
+              icon: Icons.inbox_outlined,
+              text: 'No active $label records are available.',
+              action: () => setState(() {
+                items = _load();
+              }),
+            );
+          }
+          return Column(
+            children: [
+              LinearProgressIndicator(value: (index + 1) / (steps.length + 1)),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Select $label',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                 ),
               ),
-            ),
-            Expanded(
-              child: ListView.separated(
-                itemCount: rows.length,
-                separatorBuilder: (_, _) => const Divider(height: 1),
-                itemBuilder: (_, i) => ListTile(
-                  title: Text(rows[i].label),
-                  subtitle: Text(rows[i].raw['code']?.toString() ?? ''),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    selected[label] = rows[i];
-                    if (index == steps.length) {
-                      final contextIds = selected.map(
-                        (key, value) => MapEntry(key, value.id),
-                      );
-                      contextIds['markingSchemeVersionId'] =
-                          rows[i].raw['markingSchemeVersionId'] as String;
-                      context.push('/capture', extra: contextIds);
-                    } else {
-                      setState(() {
-                        index++;
-                        items = _load();
-                      });
-                    }
-                  },
+              Expanded(
+                child: ListView.separated(
+                  itemCount: rows.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (_, i) => ListTile(
+                    title: Text(rows[i].label),
+                    subtitle: Text(rows[i].raw['code']?.toString() ?? ''),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      selected[label] = rows[i];
+                      if (index == steps.length) {
+                        final contextIds = selected.map(
+                          (key, value) => MapEntry(key, value.id),
+                        );
+                        contextIds['markingSchemeVersionId'] =
+                            rows[i].raw['markingSchemeVersionId'] as String;
+                        context.push('/capture', extra: contextIds);
+                      } else {
+                        setState(() {
+                          index++;
+                          items = _load();
+                        });
+                      }
+                    },
+                  ),
                 ),
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     ),
   );
 }

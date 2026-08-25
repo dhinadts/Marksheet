@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../auth/token_store.dart';
 import '../config/app_config.dart';
 import '../models/auth_tokens.dart';
@@ -10,13 +11,22 @@ class ApiClient {
           Dio(
             BaseOptions(
               baseUrl: AppConfig.apiBaseUrl,
-              connectTimeout: const Duration(seconds: 15),
+              connectTimeout: const Duration(seconds: 30),
               receiveTimeout: const Duration(seconds: 30),
             ),
           ) {
     this.dio.interceptors.add(
       InterceptorsWrapper(onRequest: _authorize, onError: _refresh),
     );
+    if (kDebugMode) {
+      this.dio.interceptors.add(
+        LogInterceptor(
+          requestBody: false,
+          responseBody: false,
+          logPrint: (message) => debugPrint('[API] $message'),
+        ),
+      );
+    }
   }
   final TokenStore _tokens;
   final Dio dio;

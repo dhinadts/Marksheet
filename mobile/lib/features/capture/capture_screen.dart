@@ -32,20 +32,29 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   }
 
   Future<void> _initialize() async {
+    if (!mounted) return;
     setState(() {
       busy = true;
       cameraError = null;
     });
     try {
+      await controller?.dispose();
+      controller = null;
       cameras = await availableCameras();
-      if (cameras.isNotEmpty) {
-        controller = CameraController(
-          cameras[cameraIndex],
-          ResolutionPreset.max,
-          enableAudio: false,
+      if (cameras.isEmpty) {
+        throw CameraException(
+          'no-cameras',
+          'No camera was found on this device',
         );
-        await controller!.initialize();
       }
+      cameraIndex = cameraIndex.clamp(0, cameras.length - 1);
+      final nextController = CameraController(
+        cameras[cameraIndex],
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+      controller = nextController;
+      await nextController.initialize();
     } catch (error) {
       cameraError = error is CameraException
           ? (error.description ?? error.code)
@@ -71,8 +80,21 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   Future<void> _capture() async {
     if (controller?.value.isInitialized != true) return;
     setState(() => busy = true);
-    final file = await controller!.takePicture();
-    await _inspect(file);
+    try {
+      final file = await controller!.takePicture();
+      await _inspect(file);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        busy = false;
+        cameraError = error is CameraException
+            ? (error.description ?? error.code)
+            : error.toString();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not capture image: $cameraError')),
+      );
+    }
   }
 
   Future<void> _pick() async {
@@ -119,7 +141,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
     var uploaded = false;
     if (await queue.isOnline) {
       try {
-        await ref.read(uploadRepositoryProvider).upload(imagePath: entry.imagePath, context: entry.context, clientRequestId: entry.id);
+        await ref
+            .read(uploadRepositoryProvider)
+            .upload(
+              imagePath: entry.imagePath,
+              context: entry.context,
+              clientRequestId: entry.id,
+            );
         await queue.remove(entry.id);
         await File(entry.imagePath).delete();
         uploaded = true;
@@ -131,9 +159,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
     await showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(uploaded ? 'Upload complete' : 'Capture added to device queue'),
+        title: Text(
+          uploaded ? 'Upload complete' : 'Capture added to device queue',
+        ),
         content: Text(
-          uploaded ? 'The image was verified by the server and is ready for processing.' : 'The durable local copy remains safely queued on this device.',
+          uploaded
+              ? 'The image was verified by the server and is ready for processing.'
+              : 'The durable local copy remains safely queued on this device.',
         ),
       ),
     );

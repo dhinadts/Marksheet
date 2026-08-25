@@ -3,6 +3,6 @@ class AppConfig {
   static const ec2ApiBaseUrl = 'https://api.dhinadts.com';
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:3001',
+    defaultValue: ec2ApiBaseUrl,
   );
 }

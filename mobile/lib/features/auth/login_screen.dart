@@ -12,6 +12,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _form = GlobalKey<FormState>();
   final username = TextEditingController();
   final password = TextEditingController();
+  bool _showPassword = false;
   @override
   void dispose() {
     username.dispose();
@@ -56,30 +57,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 32),
                     TextFormField(
                       controller: username,
+                      textInputAction: TextInputAction.next,
+                      autocorrect: false,
                       decoration: const InputDecoration(labelText: 'Username'),
                       validator: _required,
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: password,
-                      obscureText: true,
-                      decoration: const InputDecoration(labelText: 'Password'),
+                      obscureText: !_showPassword,
+                      textInputAction: TextInputAction.done,
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      onFieldSubmitted: auth.isLoading ? null : (_) => _login(),
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        suffixIcon: IconButton(
+                          tooltip: _showPassword
+                              ? 'Hide password'
+                              : 'Show password',
+                          onPressed: () =>
+                              setState(() => _showPassword = !_showPassword),
+                          icon: Icon(
+                            _showPassword
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                        ),
+                      ),
                       validator: _required,
                     ),
                     const SizedBox(height: 20),
                     FilledButton(
-                      onPressed: auth.isLoading
-                          ? null
-                          : () {
-                              if (_form.currentState!.validate()) {
-                                ref
-                                    .read(authControllerProvider.notifier)
-                                    .login(
-                                      username: username.text,
-                                      password: password.text,
-                                    );
-                              }
-                            },
+                      onPressed: auth.isLoading ? null : _login,
                       child: auth.isLoading
                           ? const SizedBox.square(
                               dimension: 20,
@@ -99,4 +109,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? 'Required' : null;
+
+  void _login() {
+    if (!_form.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+    ref
+        .read(authControllerProvider.notifier)
+        .login(username: username.text, password: password.text);
+  }
 }
