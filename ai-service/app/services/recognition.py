@@ -48,8 +48,15 @@ class OnnxMarkRecognizer:
         self._labels = settings.model_labels
 
     def recognize(self, image: ImageArray) -> tuple[str | None, float]:
-        gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+        if image.ndim == 2:
+            binary = cv2.threshold(
+                image, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
+            )[1]
+        else:
+            # The valuation form uses blue grid lines and red correction ticks.
+            # Marks are written in dark/black ink, so requiring every channel to
+            # be dark removes the printed grid and red annotations before OCR.
+            binary = (np.max(image, axis=2) < 155).astype(np.uint8) * 255
         height, width = binary.shape
         # Printed grid borders are not digits. Clear a small cell-edge margin.
         margin = max(1, min(height, width) // 18)
