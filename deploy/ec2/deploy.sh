@@ -42,6 +42,18 @@ ensure_secret() {
 # secret. Generate it once when an older deployment .env does not contain it.
 ensure_secret AI_INTERNAL_API_KEY
 
+cors_origins=$(grep '^CORS_ORIGINS=' .env | tail -n 1 | cut -d= -f2- || true)
+if [[ -z "$cors_origins" || "$cors_origins" == "http://localhost:3000" ]]; then
+  cors_origins="https://marksheet.dhinadts.com"
+  if grep -q '^CORS_ORIGINS=' .env; then
+    sed -i -E "s|^CORS_ORIGINS=.*$|CORS_ORIGINS=${cors_origins}|" .env
+  else
+    printf '\nCORS_ORIGINS=%s\n' "$cors_origins" >> .env
+  fi
+  export CORS_ORIGINS="$cors_origins"
+  echo "Updated and saved CORS_ORIGINS for the production web application."
+fi
+
 database_url=$(grep '^DATABASE_URL=' .env | cut -d= -f2- || true)
 if [[ -z "$database_url" ]]; then
   echo "DATABASE_URL is missing from .env." >&2
@@ -49,13 +61,14 @@ if [[ -z "$database_url" ]]; then
 fi
 if [[ "$database_url" =~ @(localhost|127\.0\.0\.1): ]]; then
   database_url=$(printf '%s' "$database_url" | sed -E 's/@(localhost|127\.0\.0\.1):/@postgres:/')
+  sed -i -E "s|^DATABASE_URL=.*$|DATABASE_URL=${database_url}|" .env
   export DATABASE_URL="$database_url"
-  echo "Updated DATABASE_URL to use the Docker PostgreSQL service."
+  echo "Updated and saved DATABASE_URL to use the Docker PostgreSQL service."
 fi
 
-echo "Starting PostgreSQL, Redis and AI service..."
+echo "Starting PostgreSQL, Redis, AI service and persistent AI worker..."
 
-docker compose up -d --build postgres redis ai-service
+docker compose --profile ai-processing up -d --build postgres redis ai-service ai-worker
 
 echo "Waiting for PostgreSQL to become ready..."
 

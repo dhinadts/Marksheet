@@ -124,10 +124,15 @@ class OfflineCaptureQueue {
   Future<List<CapturedMarkSheet>> readHistory() async {
     final encoded = await _storage.read(key: _historyKey);
     if (encoded == null) return [];
-    return (jsonDecode(encoded) as List<dynamic>)
+    final decoded = (jsonDecode(encoded) as List<dynamic>)
         .map((item) => CapturedMarkSheet.fromJson(item as Map<String, dynamic>))
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final unique = <String, CapturedMarkSheet>{};
+    for (final item in decoded) {
+      unique.putIfAbsent(item.markSheetId, () => item);
+    }
+    return unique.values.toList();
   }
 
   Future<void> recordUploaded(
@@ -136,7 +141,10 @@ class OfflineCaptureQueue {
     required String status,
   }) async {
     final history = await readHistory();
-    history.removeWhere((item) => item.localId == capture.id);
+    history.removeWhere(
+      (item) =>
+          item.localId == capture.id || item.markSheetId == markSheetId,
+    );
     history.insert(
       0,
       CapturedMarkSheet(

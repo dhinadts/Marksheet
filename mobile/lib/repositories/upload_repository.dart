@@ -41,6 +41,12 @@ class UploadRepository {
       },
     );
     final body = response.data!;
+    if (body['alreadyCaptured'] == true) {
+      return UploadResult(
+        markSheetId: body['markSheetId'] as String,
+        status: body['status']?.toString() ?? 'UPLOADED',
+      );
+    }
     final upload = body['upload'] as Map<String, dynamic>;
     final uploadHeaders = Map<String, dynamic>.from(upload['headers'] as Map)
       ..[Headers.contentLengthHeader] = bytes.length;

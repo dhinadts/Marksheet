@@ -19,6 +19,7 @@ import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../database/tenant-context.service';
 import { ObjectStorageService } from './object-storage.service';
 import { CreateUploadSessionDto } from './upload.dto';
+import { capturedMarkSheetKey } from './storage-key';
 
 @Injectable()
 export class UploadsService {
@@ -42,7 +43,25 @@ export class UploadsService {
         include: { images: { include: { fileObject: true } } },
       });
       if (existing) return this.existingSession(existing, dto, checksum);
-      const [student, offering, paperVersion, schemeVersion] =
+      const capturedAttempt = await tx.markSheet.findUnique({
+        where: {
+          tenantId_studentId_subjectOfferingId_questionPaperVersionId_attempt: {
+            tenantId: actor.tenantId,
+            studentId: dto.studentId,
+            subjectOfferingId: dto.subjectOfferingId,
+            questionPaperVersionId: dto.questionPaperVersionId,
+            attempt: dto.attempt,
+          },
+        },
+      });
+      if (capturedAttempt) {
+        return {
+          markSheetId: capturedAttempt.id,
+          status: capturedAttempt.status,
+          alreadyCaptured: true,
+        };
+      }
+      const [student, offering, paperVersion, schemeVersion, professor] =
         await Promise.all([
           tx.student.findFirst({
             where: {
@@ -50,6 +69,7 @@ export class UploadsService {
               tenantId: actor.tenantId,
               status: 'ACTIVE',
             },
+            include: { department: { include: { college: true } } },
           }),
           tx.subjectOffering.findFirst({
             where: {
@@ -57,7 +77,7 @@ export class UploadsService {
               tenantId: actor.tenantId,
               status: 'ACTIVE',
             },
-            include: { subject: true },
+            include: { subject: true, academicYear: true },
           }),
           tx.questionPaperVersion.findFirst({
             where: {
@@ -74,8 +94,12 @@ export class UploadsService {
               status: VersionStatus.PUBLISHED,
             },
           }),
+          tx.user.findFirst({
+            where: { id: actor.sub, tenantId: actor.tenantId },
+            select: { displayName: true, username: true },
+          }),
         ]);
-      if (!student || !offering || !paperVersion || !schemeVersion)
+      if (!student || !offering || !paperVersion || !schemeVersion || !professor)
         throw new BadRequestException(
           'Capture context is inactive, unpublished, missing, or outside this tenant',
         );
@@ -99,7 +123,19 @@ export class UploadsService {
         );
       const markSheetId = randomUUID();
       const fileId = randomUUID();
-      const objectKey = `${actor.tenantId}/mark-sheets/${markSheetId}/original/page-${dto.pageNumber}-${fileId}`;
+      const objectKey = capturedMarkSheetKey({
+        tenantId: actor.tenantId,
+        professorName: professor.displayName || professor.username,
+        collegeName: student.department.college.name,
+        departmentName: student.department.name,
+        academicYear: offering.academicYear.code,
+        studentName: student.fullName,
+        studentRegisterNumber: student.registerNumber,
+        markSheetId,
+        pageNumber: dto.pageNumber,
+        fileId,
+        mimeType: dto.mimeType,
+      });
       const signed = this.storage.signUpload(objectKey, dto.mimeType, checksum);
       const markSheet = await tx.markSheet.create({
         data: {

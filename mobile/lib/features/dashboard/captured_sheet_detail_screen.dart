@@ -1,17 +1,57 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/providers.dart';
 import '../../repositories/mark_sheet_repository.dart';
 
-class CapturedSheetDetailScreen extends ConsumerWidget {
+class CapturedSheetDetailScreen extends ConsumerStatefulWidget {
   const CapturedSheetDetailScreen({required this.markSheetId, super.key});
   final String markSheetId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Captured mark sheet')),
+  ConsumerState<CapturedSheetDetailScreen> createState() =>
+      _CapturedSheetDetailScreenState();
+}
+
+class _CapturedSheetDetailScreenState
+    extends ConsumerState<CapturedSheetDetailScreen> {
+  Timer? timer;
+  late Future<MarkSheetDetail> detail;
+
+  @override
+  void initState() {
+    super.initState();
+    detail = _load();
+    timer = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
+  }
+
+  Future<MarkSheetDetail> _load() =>
+      ref.read(markSheetRepositoryProvider).detail(widget.markSheetId);
+
+  void _refresh() {
+    if (mounted) setState(() => detail = _load());
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Captured mark sheet'),
+      actions: [
+        IconButton(
+          tooltip: 'Refresh',
+          onPressed: _refresh,
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+    ),
     body: FutureBuilder<MarkSheetDetail>(
-      future: ref.read(markSheetRepositoryProvider).detail(markSheetId),
+      future: detail,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
@@ -46,6 +86,13 @@ class CapturedSheetDetailScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             Text(sheet.subject),
+            if (sheet.hierarchy.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                sheet.hierarchy,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
             const SizedBox(height: 12),
             if (sheet.marks.isEmpty)
               Card(
@@ -53,7 +100,7 @@ class CapturedSheetDetailScreen extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     sheet.status == 'UPLOADED' || sheet.status == 'PROCESSING'
-                        ? 'Handwriting extraction is processing. Pull back and reopen to refresh.'
+                        ? 'Numeric mark extraction is processing. This page refreshes automatically.'
                         : 'No extracted marks are available. Manual review is required.',
                   ),
                 ),
@@ -79,7 +126,7 @@ class CapturedSheetDetailScreen extends ConsumerWidget {
                   title: const Text('Total'),
                   subtitle: Text(
                     sheet.isComplete
-                        ? 'Computer-calculated total'
+                        ? 'Computer-calculated total${sheet.calculationVersion == null ? '' : ' • Version ${sheet.calculationVersion}'}'
                         : 'Incomplete — review required',
                   ),
                   trailing: Text(

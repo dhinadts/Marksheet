@@ -73,6 +73,14 @@ class PipelineService:
 
     def extract_marks(self, request: RecognitionRequest) -> ExtractionResponse:
         prepared = self._prepare(request)
+        # Keep one deterministic converted page beside the captured original.
+        # The checksum makes this an immutable processing version and retries
+        # overwrite only the same version key.
+        self._storage.put(
+            f"{prepared.object_key_prefix}/converted.png",
+            self._preprocessor.encode_png(prepared.processed.image),
+            "image/png",
+        )
         match = self._templates.match(prepared.processed.image, request.template)
         crops = self._templates.extract_cells(prepared.processed.image, request.template)
         recognizer = self._recognizer or OnnxMarkRecognizer(self._settings)
@@ -119,7 +127,17 @@ class PipelineService:
 
     def _prepare(self, request: StageRequest) -> PreparedDocument:
         processed = self._preprocessor.preprocess(self._load(request))
-        prefix = f"{request.context.tenant_id}/mark-sheets/{request.context.mark_sheet_id}/derived/{request.source.checksum_sha256}"
+        captured_marker = "/captured/"
+        if captured_marker in request.source.object_key:
+            sheet_prefix = request.source.object_key.split(captured_marker, 1)[0]
+            prefix = (
+                f"{sheet_prefix}/converted/versions/"
+                f"{request.source.checksum_sha256}"
+            )
+        else:
+            # Backward compatibility for captures stored before hierarchical
+            # object keys were introduced.
+            prefix = f"{request.context.tenant_id}/mark-sheets/{request.context.mark_sheet_id}/derived/{request.source.checksum_sha256}"
         return PreparedDocument(processed, prefix)
 
     def _store_crops(self, crops: list[CellCrop], prefix: str) -> list[DetectedCell]:

@@ -23,7 +23,10 @@ class RedisJobQueue:
     def __init__(self, redis_url: str | None) -> None:
         if not redis_url:
             raise ServiceError(503, "QUEUE_NOT_CONFIGURED", "AI job queue is not configured")
-        self.client = redis.Redis.from_url(redis_url, decode_responses=True, socket_timeout=5)
+        # XREADGROUP blocks for five seconds in the worker. Keep the socket
+        # timeout comfortably above that so an idle queue is not treated as a
+        # failed Redis connection.
+        self.client = redis.Redis.from_url(redis_url, decode_responses=True, socket_timeout=15)
 
     def enqueue(self, request: ProcessMarkSheetRequest) -> JobResponse:
         key = self._key(request.context.tenant_id, request.job_id)

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,15 +14,43 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen>
+    with WidgetsBindingObserver {
   final queue = OfflineCaptureQueue();
+  final connectivity = Connectivity();
+  StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
   late Future<(List<QueuedCapture>, List<CapturedMarkSheet>)> captures;
   bool uploading = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     captures = _load();
+    connectivitySubscription = connectivity.onConnectivityChanged.listen((
+      results,
+    ) {
+      if (!results.contains(ConnectivityResult.none)) {
+        _uploadPending(silent: true);
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _uploadPending(silent: true);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _uploadPending(silent: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    connectivitySubscription?.cancel();
+    super.dispose();
   }
 
   Future<(List<QueuedCapture>, List<CapturedMarkSheet>)> _load() async =>
@@ -30,12 +60,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     captures = _load();
   });
 
-  Future<void> _uploadPending() async {
-    if (uploading) return;
+  Future<void> _uploadPending({bool silent = false}) async {
+    if (uploading || !mounted) return;
+    // Claim the upload loop before any asynchronous work. App resume, the
+    // connectivity listener and the first-frame callback can otherwise all
+    // start a retry for the same capture at once.
     setState(() => uploading = true);
+    var pending = <QueuedCapture>[];
     var completed = 0;
     try {
-      for (final entry in await queue.read()) {
+      pending = await queue.read();
+      if (pending.isEmpty || !await queue.isOnline) return;
+      for (final entry in pending) {
         try {
           final result = await ref
               .read(uploadRepositoryProvider)
@@ -63,13 +99,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           uploading = false;
           captures = _load();
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '$completed capture${completed == 1 ? '' : 's'} uploaded',
+        if (pending.isNotEmpty && (!silent || completed > 0)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                completed == 0
+                    ? 'Queued captures are still waiting for the server'
+                    : '$completed capture${completed == 1 ? '' : 's'} moved to Captured mark sheets',
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     }
   }
@@ -143,7 +183,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     subtitle: Text(
                       '${pending.length} capture${pending.length == 1 ? '' : 's'} waiting to upload${pending.isEmpty ? '' : ' • Tap to retry'}',
                     ),
-                    onTap: pending.isEmpty || uploading ? null : _uploadPending,
+                    onTap: pending.isEmpty || uploading
+                        ? null
+                        : () => _uploadPending(),
                   ),
                 ),
                 const SizedBox(height: 12),

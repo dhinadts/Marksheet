@@ -21,18 +21,28 @@ class MarkSheetDetail {
     required this.status,
     required this.student,
     required this.subject,
+    required this.hierarchy,
     required this.marks,
     this.imageUrl,
+    this.storedTotal,
+    this.storedMaximum,
+    this.calculationVersion,
   });
 
   final String status;
   final String student;
   final String subject;
+  final String hierarchy;
   final String? imageUrl;
   final List<DisplayMark> marks;
+  final double? storedTotal;
+  final double? storedMaximum;
+  final int? calculationVersion;
 
-  double get total => marks.fold(0, (sum, mark) => sum + (mark.value ?? 0));
-  double get maximum => marks.fold(0, (sum, mark) => sum + mark.maximum);
+  double get total =>
+      storedTotal ?? marks.fold(0, (sum, mark) => sum + (mark.value ?? 0));
+  double get maximum =>
+      storedMaximum ?? marks.fold(0, (sum, mark) => sum + mark.maximum);
   bool get isComplete =>
       marks.isNotEmpty && marks.every((mark) => mark.value != null);
 }
@@ -55,6 +65,28 @@ class MarkSheetRepository {
     final subject = Map<String, dynamic>.from(
       offering['subject'] as Map? ?? const {},
     );
+    final department = Map<String, dynamic>.from(
+      student['department'] as Map? ?? const {},
+    );
+    final college = Map<String, dynamic>.from(
+      department['college'] as Map? ?? const {},
+    );
+    final section = Map<String, dynamic>.from(
+      student['section'] as Map? ?? const {},
+    );
+    final academicClass = Map<String, dynamic>.from(
+      section['class'] as Map? ?? const {},
+    );
+    final academicYear = Map<String, dynamic>.from(
+      academicClass['academicYear'] as Map? ?? const {},
+    );
+    final hierarchy = [
+      college['name'],
+      department['name'],
+      academicYear['code'],
+      academicClass['name'],
+      section['name'],
+    ].where((value) => value != null && value.toString().isNotEmpty).join(' • ');
     final sessions = (json['verificationSessions'] as List? ?? const []);
     final items = sessions.isEmpty
         ? const <dynamic>[]
@@ -90,15 +122,24 @@ class MarkSheetRepository {
       );
     }).toList();
     final images = json['images'] as List? ?? const [];
+    final calculations = json['calculationResults'] as List? ?? const [];
+    final latestCalculation = calculations.isEmpty
+        ? const <String, dynamic>{}
+        : Map<String, dynamic>.from(calculations.first as Map);
     return MarkSheetDetail(
       status: json['status']?.toString() ?? 'UPLOADED',
       student: '${student['registerNumber'] ?? ''} ${student['fullName'] ?? ''}'
           .trim(),
       subject: '${subject['code'] ?? ''} ${subject['name'] ?? ''}'.trim(),
+      hierarchy: hierarchy,
       imageUrl: images.isEmpty
           ? null
           : Map<String, dynamic>.from(images.first as Map)['url']?.toString(),
       marks: marks,
+      storedTotal: _number(latestCalculation['grandTotal']),
+      storedMaximum: _number(latestCalculation['maximumMark']),
+      calculationVersion: (latestCalculation['calculationVersion'] as num?)
+          ?.toInt(),
     );
   }
 

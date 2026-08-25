@@ -164,9 +164,22 @@ export class MarkSheetsService {
       const sheet = await tx.markSheet.findFirst({
         where: { id, tenantId: actor.tenantId },
         include: {
-          student: { select: { registerNumber: true, fullName: true } },
+          student: {
+            include: {
+              department: { include: { college: true } },
+              program: true,
+              section: {
+                include: {
+                  class: { include: { academicYear: true, studyYear: true } },
+                },
+              },
+            },
+          },
           subjectOffering: {
-            include: { subject: { select: { code: true, name: true } } },
+            include: {
+              subject: { select: { code: true, name: true } },
+              academicYear: true,
+            },
           },
           images: {
             include: { fileObject: true },
@@ -190,6 +203,10 @@ export class MarkSheetsService {
                 },
               },
             },
+          },
+          calculationResults: {
+            orderBy: { calculationVersion: 'desc' },
+            take: 1,
           },
         },
       });
