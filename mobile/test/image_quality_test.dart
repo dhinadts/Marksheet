@@ -4,16 +4,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 
 void main() {
-  test('rejects low-resolution captures', () async {
+  test('accepts a decodable sheet regardless of resolution', () async {
     final directory = await Directory.systemTemp.createTemp(
       'ai-marks-quality-',
     );
     addTearDown(() => directory.delete(recursive: true));
     final file = File('${directory.path}/small.jpg');
-    await file.writeAsBytes(img.encodeJpg(img.Image(width: 320, height: 240)));
+    final image = img.Image(width: 320, height: 240);
+    for (var y = 0; y < image.height; y++) {
+      for (var x = 0; x < image.width; x++) {
+        final value = ((x ~/ 8) + (y ~/ 8)).isEven ? 70 : 210;
+        image.setPixelRgb(x, y, value, value, value);
+      }
+    }
+    await file.writeAsBytes(img.encodeJpg(image));
     final result = await const ImageQualityAnalyzer().analyze(file.path);
-    expect(result.acceptable, isFalse);
-    expect(result.messages, contains('Resolution is too low'));
+    expect(result.width, 320);
+    expect(result.height, 240);
+    expect(result.messages, isNot(contains('Resolution is too low')));
   });
 
   test('rejects undecodable content', () async {

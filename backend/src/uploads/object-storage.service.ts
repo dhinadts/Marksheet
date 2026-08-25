@@ -79,9 +79,12 @@ export class ObjectStorageService {
     const accessKey = this.required('AWS_ACCESS_KEY_ID');
     const secretKey = this.required('AWS_SECRET_ACCESS_KEY');
     const bucket = this.bucketName;
-    const endpoint = this.config
-      .get<string>('AWS_S3_ENDPOINT', `https://s3.${region}.amazonaws.com`)
-      .replace(/\/$/, '');
+    const configuredEndpoint = this.config
+      .get<string>('AWS_S3_ENDPOINT')
+      ?.trim();
+    const endpoint = (
+      configuredEndpoint || `https://s3.${region}.amazonaws.com`
+    ).replace(/\/$/, '');
     const pathStyle =
       this.config.get<string>('AWS_S3_FORCE_PATH_STYLE', 'false') === 'true';
     const base = new URL(endpoint);

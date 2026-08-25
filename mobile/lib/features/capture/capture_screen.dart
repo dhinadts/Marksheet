@@ -23,6 +23,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   ImageQualityResult? quality;
   bool busy = true;
   bool flash = false;
+  bool _isActive = true;
+  bool _initializing = false;
   String? cameraError;
   @override
   void initState() {
@@ -32,14 +34,19 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   }
 
   Future<void> _initialize() async {
-    if (!mounted) return;
+    if (!mounted || !_isActive || _initializing) return;
+    _initializing = true;
     setState(() {
       busy = true;
       cameraError = null;
     });
+    CameraController? nextController;
     try {
-      await controller?.dispose();
+      final previousController = controller;
       controller = null;
+      if (previousController?.value.isInitialized == true) {
+        await previousController!.dispose();
+      }
       cameras = await availableCameras();
       if (cameras.isEmpty) {
         throw CameraException(
@@ -48,32 +55,60 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
         );
       }
       cameraIndex = cameraIndex.clamp(0, cameras.length - 1);
-      final nextController = CameraController(
+      nextController = CameraController(
         cameras[cameraIndex],
         ResolutionPreset.high,
         enableAudio: false,
       );
-      controller = nextController;
       await nextController.initialize();
+      if (!mounted || !_isActive) {
+        await nextController.dispose();
+        nextController = null;
+        return;
+      }
+      controller = nextController;
+      nextController = null;
     } catch (error) {
-      cameraError = error is CameraException
-          ? (error.description ?? error.code)
-          : error.toString();
+      if (mounted) cameraError = _cameraErrorMessage(error);
     } finally {
+      // CameraX cannot dispose a preview surface before initialization ends.
+      if (nextController?.value.isInitialized == true) {
+        await nextController!.dispose();
+      }
+      _initializing = false;
       if (mounted) setState(() => busy = false);
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive) controller?.dispose();
-    if (state == AppLifecycleState.resumed) _initialize();
+    if (state == AppLifecycleState.resumed) {
+      _isActive = true;
+      _initialize();
+      return;
+    }
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      _isActive = false;
+      _releaseInitializedController();
+    }
+  }
+
+  Future<void> _releaseInitializedController() async {
+    final currentController = controller;
+    controller = null;
+    if (currentController?.value.isInitialized == true) {
+      await currentController!.dispose();
+    }
   }
 
   @override
   void dispose() {
+    _isActive = false;
     WidgetsBinding.instance.removeObserver(this);
-    controller?.dispose();
+    _releaseInitializedController();
     super.dispose();
   }
 
@@ -87,9 +122,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
       if (!mounted) return;
       setState(() {
         busy = false;
-        cameraError = error is CameraException
-            ? (error.description ?? error.code)
-            : error.toString();
+        cameraError = _cameraErrorMessage(error);
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not capture image: $cameraError')),
@@ -123,16 +156,19 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
   }
 
   Future<void> _switchCamera() async {
-    if (cameras.length < 2) return;
-    await controller?.dispose();
+    if (cameras.length < 2 || _initializing) return;
     cameraIndex = (cameraIndex + 1) % cameras.length;
-    controller = CameraController(
-      cameras[cameraIndex],
-      ResolutionPreset.max,
-      enableAudio: false,
-    );
-    await controller!.initialize();
-    setState(() {});
+    await _initialize();
+  }
+
+  String _cameraErrorMessage(Object error) {
+    final message = error is CameraException
+        ? (error.description ?? error.code)
+        : error.toString();
+    final firstLine = message.split(RegExp(r'[\r\n]')).first.trim();
+    return firstLine.length <= 180
+        ? firstLine
+        : '${firstLine.substring(0, 177)}...';
   }
 
   Future<void> _queue() async {
@@ -141,13 +177,18 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
     var uploaded = false;
     if (await queue.isOnline) {
       try {
-        await ref
+        final result = await ref
             .read(uploadRepositoryProvider)
             .upload(
               imagePath: entry.imagePath,
               context: entry.context,
               clientRequestId: entry.id,
             );
+        await queue.recordUploaded(
+          entry,
+          markSheetId: result.markSheetId,
+          status: result.status,
+        );
         await queue.remove(entry.id);
         await File(entry.imagePath).delete();
         uploaded = true;

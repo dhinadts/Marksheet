@@ -49,9 +49,6 @@ class ImageQualityAnalyzer {
     final brightness = luminance / count;
     final sharpness = edges / (count * 2);
     final messages = <String>[];
-    if (decoded.width < 1600 || decoded.height < 1200) {
-      messages.add('Resolution is too low');
-    }
     if (brightness < 0.18) messages.add('Image is too dark');
     if (brightness > 0.92) messages.add('Possible glare or overexposure');
     if (sharpness < 0.025) messages.add('Image may be blurred');

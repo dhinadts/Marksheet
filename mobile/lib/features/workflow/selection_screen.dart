@@ -144,6 +144,11 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
                         final contextIds = selected.map(
                           (key, value) => MapEntry(key, value.id),
                         );
+                        contextIds['_studentLabel'] =
+                            selected['Student']?.label ?? 'Student';
+                        contextIds['_subjectLabel'] =
+                            selected['Subject']?.label ?? 'Subject';
+                        contextIds['_paperLabel'] = rows[i].label;
                         contextIds['markingSchemeVersionId'] =
                             rows[i].raw['markingSchemeVersionId'] as String;
                         context.push('/capture', extra: contextIds);

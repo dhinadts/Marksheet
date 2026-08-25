@@ -4,6 +4,7 @@ import '../auth/token_store.dart';
 import '../network/api_client.dart';
 import '../repositories/academic_repository.dart';
 import '../repositories/upload_repository.dart';
+import '../repositories/mark_sheet_repository.dart';
 
 final tokenStoreProvider = Provider((ref) => TokenStore());
 final apiClientProvider = Provider(
@@ -18,6 +19,9 @@ final academicRepositoryProvider = Provider(
 );
 final uploadRepositoryProvider = Provider(
   (ref) => UploadRepository(ref.watch(apiClientProvider).dio),
+);
+final markSheetRepositoryProvider = Provider(
+  (ref) => MarkSheetRepository(ref.watch(apiClientProvider).dio),
 );
 final authControllerProvider = AsyncNotifierProvider<AuthController, bool>(
   AuthController.new,

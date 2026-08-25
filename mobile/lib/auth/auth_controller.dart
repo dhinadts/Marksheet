@@ -17,10 +17,7 @@ class AuthController extends AsyncNotifier<bool> {
           .dio
           .post<Map<String, dynamic>>(
             '/auth/login',
-            data: {
-              'username': username.trim(),
-              'password': password,
-            },
+            data: {'username': username.trim(), 'password': password},
           );
       await ref
           .read(tokenStoreProvider)
