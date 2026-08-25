@@ -4,6 +4,10 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM node:20-alpine AS builder
+# Cap the build heap so V8 garbage-collects earlier instead of growing past
+# physical RAM on small deploy hosts, which otherwise thrashes swap or gets
+# OOM-killed mid-build.
+ENV NODE_OPTIONS=--max-old-space-size=512
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .

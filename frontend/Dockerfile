@@ -7,6 +7,10 @@ FROM node:20-alpine AS builder
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
+# Cap the build heap so V8 garbage-collects earlier instead of growing past
+# physical RAM on small deploy hosts, which otherwise thrashes swap or gets
+# OOM-killed mid-build.
+ENV NODE_OPTIONS=--max-old-space-size=512
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
