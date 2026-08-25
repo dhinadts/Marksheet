@@ -16,4 +16,6 @@ CAPABILITIES = (
     Capability("handwriting_recognition", True, 12),
     Capability("mark_validation", True, 12),
     Capability("mark_sheet_processing", True, 12),
+    Capability("openai_vision_recognition", True, 13),
+    Capability("vision_language_local_recognition", False, 14),
 )

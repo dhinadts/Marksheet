@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Literal, cast
+
+RecognizerBackend = Literal["template_cnn", "openai_vision", "vision_language_local"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +26,9 @@ class Settings:
     marks_debug: bool = False
     marks_min_confidence: float = 0.65
     marks_auto_accept_confidence: float = 0.85
+    recognizer_backend: RecognizerBackend = "template_cnn"
+    openai_api_key: str | None = None
+    openai_vision_model: str = "gpt-4o"
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -53,6 +59,13 @@ class Settings:
         if not labels or any(not item for item in labels) or len(set(labels)) != len(labels):
             raise ValueError("AI_MODEL_LABELS must contain unique, non-empty labels")
 
+        recognizer_backend = os.getenv("AI_RECOGNIZER_BACKEND", "template_cnn")
+        if recognizer_backend not in {"template_cnn", "openai_vision", "vision_language_local"}:
+            raise ValueError(
+                "AI_RECOGNIZER_BACKEND must be one of "
+                "'template_cnn', 'openai_vision', 'vision_language_local'"
+            )
+
         return cls(
             environment=os.getenv("AI_ENVIRONMENT", "development"),
             log_level=log_level,
@@ -72,4 +85,7 @@ class Settings:
             marks_auto_accept_confidence=float(
                 os.getenv("MARKS_AUTO_ACCEPT_CONFIDENCE", "0.85")
             ),
+            recognizer_backend=cast(RecognizerBackend, recognizer_backend),
+            openai_api_key=os.getenv("OPENAI_API_KEY") or None,
+            openai_vision_model=os.getenv("AI_OPENAI_VISION_MODEL", "gpt-4o"),
         )

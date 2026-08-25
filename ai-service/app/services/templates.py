@@ -7,7 +7,9 @@ import numpy as np
 from app.core.errors import ServiceError
 from app.schemas.common import TemplateDefinition
 from app.schemas.results import DetectedCell, TemplateMatchResponse
+from app.services.grid_detection import GridSnapper, normalized_to_pixel_box
 from app.services.preprocessing import ImageArray
+from app.services.table_detection import TableDetection
 
 
 @dataclass(slots=True)
@@ -17,6 +19,9 @@ class CellCrop:
 
 
 class TemplateDetector:
+    def __init__(self, snapper: GridSnapper | None = None) -> None:
+        self._snapper = snapper or GridSnapper()
+
     def match(self, image: ImageArray, template: TemplateDefinition) -> TemplateMatchResponse:
         height, width = image.shape[:2]
         observed = width / height
@@ -32,7 +37,12 @@ class TemplateDetector:
             observed_aspect_ratio=round(observed, 6),
         )
 
-    def extract_cells(self, image: ImageArray, template: TemplateDefinition) -> list[CellCrop]:
+    def extract_cells(
+        self,
+        image: ImageArray,
+        template: TemplateDefinition,
+        table: TableDetection | None = None,
+    ) -> list[CellCrop]:
         match = self.match(image, template)
         if not match.matched:
             raise ServiceError(
@@ -41,11 +51,12 @@ class TemplateDetector:
         height, width = image.shape[:2]
         cells: list[CellCrop] = []
         for cell in template.cells:
-            x1 = max(0, round(cell.box.x * width))
-            y1 = max(0, round(cell.box.y * height))
-            x2 = min(width, round((cell.box.x + cell.box.width) * width))
-            y2 = min(height, round((cell.box.y + cell.box.height) * height))
-            crop = image[y1:y2, x1:x2]
+            pixel_box = None
+            if table is not None and table.detected:
+                pixel_box = self._snapper.snap(cell.box, table, width, height)
+            if pixel_box is None:
+                pixel_box = normalized_to_pixel_box(cell.box, width, height)
+            crop = image[pixel_box.y1 : pixel_box.y2, pixel_box.x1 : pixel_box.x2]
             if crop.size == 0 or min(crop.shape[:2]) < 4:
                 raise ServiceError(
                     422,

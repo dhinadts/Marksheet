@@ -23,4 +23,12 @@ def test_readiness_requires_internal_auth_configuration() -> None:
     assert unavailable.json()["status"] == "not_ready"
     assert available.status_code == 200
     assert available.json()["status"] == "ready"
-    assert all(item["available"] for item in available.json()["capabilities"])
+    capabilities = {item["name"]: item["available"] for item in available.json()["capabilities"]}
+    # Readiness reflects auth configuration only, not whether every capability
+    # has shipped -- vision_language_local_recognition is deliberately reserved
+    # for a future phase (the local vision-language model, post EC2 GPU upgrade).
+    assert capabilities["vision_language_local_recognition"] is False
+    assert all(
+        available for name, available in capabilities.items()
+        if name != "vision_language_local_recognition"
+    )

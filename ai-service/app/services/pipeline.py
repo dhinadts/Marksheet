@@ -3,7 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.core.config import Settings
-from app.schemas.common import RecognitionRequest, StageRequest, TemplateStageRequest
+from app.core.errors import CapabilityUnavailableError
+from app.schemas.common import (
+    ConfidenceThresholds,
+    RecognitionRequest,
+    StageRequest,
+    TemplateCell,
+    TemplateStageRequest,
+)
 from app.schemas.results import (
     CellDetectionResponse,
     DetectedCell,
@@ -15,6 +22,7 @@ from app.schemas.results import (
     TemplateMatchResponse,
 )
 from app.services.arithmetic import validate_arithmetic
+from app.services.openai_vision import OpenAiPageRecognizer, PageMarkResult, PageRecognition
 from app.services.preprocessing import ImageArray, ImagePreprocessor, PreprocessedImage
 from app.services.recognition import OnnxMarkRecognizer, Recognition, parse_mark
 from app.services.storage import ObjectStore
@@ -38,6 +46,7 @@ class PipelineService:
         template_detector: TemplateDetector | None = None,
         recognizer: Recognition | None = None,
         table_detector: MarksTableDetector | None = None,
+        page_recognizer: PageRecognition | None = None,
     ) -> None:
         self._settings = settings
         self._storage = storage
@@ -45,6 +54,7 @@ class PipelineService:
         self._templates = template_detector or TemplateDetector()
         self._recognizer = recognizer
         self._table_detector = table_detector or MarksTableDetector()
+        self._page_recognizer = page_recognizer
 
     def quality_check(self, request: StageRequest) -> QualityResponse:
         return self._preprocessor.quality(self._load(request))
@@ -71,50 +81,66 @@ class PipelineService:
     def detect_cells(self, request: TemplateStageRequest) -> CellDetectionResponse:
         prepared = self._prepare(request)
         match = self._templates.match(prepared.processed.image, request.template)
-        crops = self._templates.extract_cells(prepared.processed.image, request.template)
+        table = self._table_detector.detect(prepared.processed.image)
+        crops = self._templates.extract_cells(prepared.processed.image, request.template, table)
         return CellDetectionResponse(
             template_match=match, cells=self._store_crops(crops, prepared.object_key_prefix)
         )
 
     def extract_marks(self, request: RecognitionRequest) -> ExtractionResponse:
+        if self._settings.recognizer_backend == "vision_language_local":
+            # Extension point for a future local vision-language model (e.g. a
+            # Qwen2-VL-class model) that would read the whole preprocessed page
+            # once GPU capacity is available after the EC2 upgrade. Fails loudly
+            # rather than silently falling back to a different backend, and
+            # before any storage writes so an unimplemented backend has no
+            # side effects.
+            raise CapabilityUnavailableError("vision_language_local_recognition", target_phase=14)
+
         prepared = self._prepare(request)
         # Keep one deterministic converted page beside the captured original.
         # The checksum makes this an immutable processing version and retries
         # overwrite only the same version key.
-        self._storage.put(
-            f"{prepared.object_key_prefix}/converted.png",
-            self._preprocessor.encode_png(prepared.processed.image),
-            "image/png",
-        )
+        page_png = self._preprocessor.encode_png(prepared.processed.image)
+        self._storage.put(f"{prepared.object_key_prefix}/converted.png", page_png, "image/png")
         match = self._templates.match(prepared.processed.image, request.template)
         table = self._table_detector.detect(prepared.processed.image)
-        crops = self._templates.extract_cells(prepared.processed.image, request.template)
-        recognizer = self._recognizer or OnnxMarkRecognizer(self._settings)
-        marks: list[ExtractedMarkResult] = []
-        for crop in crops:
-            raw_text, confidence = recognizer.recognize(crop.image)
-            value = parse_mark(raw_text)
-            status, reason = classify_extraction(
-                value,
-                crop.definition.maximum_mark,
-                confidence,
-                request.confidence_thresholds,
+
+        marks: list[ExtractedMarkResult]
+        if self._settings.recognizer_backend == "openai_vision":
+            page_recognizer = self._page_recognizer or OpenAiPageRecognizer(self._settings)
+            page_results = page_recognizer.recognize_page(page_png, request.template.cells)
+            marks = self._map_page_results(
+                page_results, request.template.cells, request.confidence_thresholds
             )
-            marks.append(
-                ExtractedMarkResult(
-                    marking_scheme_item_id=crop.definition.marking_scheme_item_id,
-                    question_id=crop.definition.question_id,
-                    question_part_id=crop.definition.question_part_id,
-                    label=crop.definition.label,
-                    raw_text=raw_text,
-                    value=value,
-                    maximum_mark=crop.definition.maximum_mark,
-                    confidence=round(confidence, 6),
-                    status=status,
-                    reason=reason,
-                    bounding_box=crop.definition.bounding_box,
+        else:
+            crops = self._templates.extract_cells(prepared.processed.image, request.template, table)
+            recognizer = self._recognizer or OnnxMarkRecognizer(self._settings)
+            marks = []
+            for crop in crops:
+                raw_text, confidence = recognizer.recognize(crop.image)
+                value = parse_mark(raw_text)
+                status, reason = classify_extraction(
+                    value,
+                    crop.definition.maximum_mark,
+                    confidence,
+                    request.confidence_thresholds,
                 )
-            )
+                marks.append(
+                    ExtractedMarkResult(
+                        marking_scheme_item_id=crop.definition.marking_scheme_item_id,
+                        question_id=crop.definition.question_id,
+                        question_part_id=crop.definition.question_part_id,
+                        label=crop.definition.label,
+                        raw_text=raw_text,
+                        value=value,
+                        maximum_mark=crop.definition.maximum_mark,
+                        confidence=round(confidence, 6),
+                        status=status,
+                        reason=reason,
+                        bounding_box=crop.definition.bounding_box,
+                    )
+                )
         validation = validate_arithmetic(marks)
         return ExtractionResponse(
             model_version_id=request.model_version_id,
@@ -135,6 +161,42 @@ class PipelineService:
                 mark.status == "AUTO_ACCEPT" for mark in marks
             ) or not validation.complete,
         )
+
+    def _map_page_results(
+        self,
+        page_results: list[PageMarkResult],
+        cells: list[TemplateCell],
+        thresholds: ConfidenceThresholds,
+    ) -> list[ExtractedMarkResult]:
+        # OpenAI has no calibrated confidence score the way the ONNX classifier's
+        # softmax does. Rather than trust a self-reported number, every mark from
+        # this backend is capped just below the auto-accept threshold, so it can
+        # at best reach REVIEW_RECOMMENDED -- a human always reviews cloud-sourced
+        # marks before they count toward a grade.
+        capped_confidence = max(0.0, thresholds.auto_accept - 1e-6)
+        results_by_label = {result.label: result for result in page_results}
+        marks: list[ExtractedMarkResult] = []
+        for cell in cells:
+            result = results_by_label.get(cell.label)
+            value = result.value if result is not None else None
+            confidence = capped_confidence if value is not None else 0.0
+            status, reason = classify_extraction(value, cell.maximum_mark, confidence, thresholds)
+            marks.append(
+                ExtractedMarkResult(
+                    marking_scheme_item_id=cell.marking_scheme_item_id,
+                    question_id=cell.question_id,
+                    question_part_id=cell.question_part_id,
+                    label=cell.label,
+                    raw_text=result.raw_text if result is not None else None,
+                    value=value,
+                    maximum_mark=cell.maximum_mark,
+                    confidence=round(confidence, 6),
+                    status=status,
+                    reason=reason,
+                    bounding_box=cell.box,
+                )
+            )
+        return marks
 
     def _load(self, request: StageRequest) -> ImageArray:
         if request.source.size_bytes > self._settings.max_image_bytes:
