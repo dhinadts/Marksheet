@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import type { AccessClaims } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { MarkSheetsService } from '../mark-sheets/mark-sheets.service';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../database/tenant-context.service';
 import { ObjectStorageService } from './object-storage.service';
@@ -28,6 +29,7 @@ export class UploadsService {
     private readonly tenant: TenantContextService,
     private readonly storage: ObjectStorageService,
     private readonly audit: AuditService,
+    private readonly markSheets: MarkSheetsService,
   ) {}
 
   create(dto: CreateUploadSessionDto, actor: AccessClaims) {
@@ -99,7 +101,13 @@ export class UploadsService {
             select: { displayName: true, username: true },
           }),
         ]);
-      if (!student || !offering || !paperVersion || !schemeVersion || !professor)
+      if (
+        !student ||
+        !offering ||
+        !paperVersion ||
+        !schemeVersion ||
+        !professor
+      )
         throw new BadRequestException(
           'Capture context is inactive, unpublished, missing, or outside this tenant',
         );
@@ -194,8 +202,9 @@ export class UploadsService {
     });
   }
 
-  complete(markSheetId: string, actor: AccessClaims) {
-    return this.completeVerified(markSheetId, actor);
+  async complete(markSheetId: string, actor: AccessClaims) {
+    const uploaded = await this.completeVerified(markSheetId, actor);
+    return this.markSheets.processUploaded(markSheetId, actor, uploaded);
   }
 
   private async completeVerified(markSheetId: string, actor: AccessClaims) {

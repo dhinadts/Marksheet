@@ -48,6 +48,39 @@ class OnnxMarkRecognizer:
         self._labels = settings.model_labels
 
     def recognize(self, image: ImageArray) -> tuple[str | None, float]:
+        gray = image if image.ndim == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+        height, width = binary.shape
+        # Printed grid borders are not digits. Clear a small cell-edge margin.
+        margin = max(1, min(height, width) // 18)
+        binary[:margin, :] = 0
+        binary[-margin:, :] = 0
+        binary[:, :margin] = 0
+        binary[:, -margin:] = 0
+        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        boxes = [
+            cv2.boundingRect(contour)
+            for contour in contours
+            if cv2.contourArea(contour) >= max(6, height * width * 0.002)
+        ]
+        boxes = [box for box in boxes if box[3] >= height * 0.22 and box[2] < width * 0.8]
+        boxes.sort(key=lambda box: box[0])
+        if not boxes:
+            return None, 0.0
+        digits: list[str] = []
+        confidences: list[float] = []
+        for x, y, box_width, box_height in boxes[:3]:
+            pad = max(2, int(max(box_width, box_height) * 0.15))
+            digit = binary[
+                max(0, y - pad) : min(height, y + box_height + pad),
+                max(0, x - pad) : min(width, x + box_width + pad),
+            ]
+            label, confidence = self._recognize_digit(digit)
+            digits.append(label)
+            confidences.append(confidence)
+        return "".join(digits), min(confidences)
+
+    def _recognize_digit(self, image: ImageArray) -> tuple[str, float]:
         tensor = self._prepare(image)
         try:
             output = cast(

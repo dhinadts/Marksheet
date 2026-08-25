@@ -58,6 +58,7 @@ describe('MarkSheetsService', () => {
       tenant as never,
       audit as never,
       {} as never,
+      {} as never,
     );
 
     await service.reviewItem(
@@ -115,6 +116,7 @@ describe('MarkSheetsService', () => {
       {} as never,
       tenant as never,
       { record: jest.fn() } as never,
+      {} as never,
       {} as never,
     );
 

@@ -7,6 +7,7 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY app ./app
+COPY models ./models
 RUN pip install --no-cache-dir .
 
 RUN addgroup --system app && adduser --system --ingroup app app

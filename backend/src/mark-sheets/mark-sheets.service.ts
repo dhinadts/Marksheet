@@ -4,7 +4,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   MarkSheetStatus,
   MarkValueSource,
@@ -30,7 +32,199 @@ export class MarkSheetsService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     private readonly storage: ObjectStorageService,
+    private readonly config: ConfigService,
   ) {}
+
+  async processUploaded(
+    id: string,
+    actor: AccessClaims,
+    uploaded: { markSheetId: string; status: MarkSheetStatus },
+  ) {
+    const context = await this.tenant.transaction(this.prisma, async (tx) => {
+      const sheet = await tx.markSheet.findFirst({
+        where: { id, tenantId: actor.tenantId },
+        include: {
+          images: {
+            include: { fileObject: true },
+            orderBy: { pageNumber: 'asc' },
+          },
+          questionPaperVersion: {
+            include: { questions: { include: { parts: true } } },
+          },
+          markingSchemeVersion: {
+            include: {
+              items: { include: { question: true, questionPart: true } },
+            },
+          },
+        },
+      });
+      if (!sheet) throw new NotFoundException();
+      if (
+        await tx.extractedMark.count({
+          where: { tenantId: actor.tenantId, markSheetId: id },
+        })
+      )
+        return undefined;
+      if (sheet.status !== MarkSheetStatus.UPLOADED) return undefined;
+      const image = sheet.images[0];
+      const template = sheet.questionPaperVersion.imageTemplate as unknown as {
+        expectedAspectRatio: number;
+        aspectRatioTolerance: number;
+        cells: Array<{
+          questionCode: string;
+          questionPartCode?: string;
+          box: Record<string, number>;
+        }>;
+      } | null;
+      if (!image || !template?.cells?.length)
+        throw new BadRequestException(
+          'Published question paper has no numeric mark-cell image template',
+        );
+      let model = await tx.aiModelVersion.findFirst({
+        where: { tenantId: actor.tenantId, status: 'ACTIVE' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!model) {
+        model = await tx.aiModelVersion.create({
+          data: {
+            tenantId: actor.tenantId,
+            name: 'numeric-mark-recognizer',
+            version: 'configured-v1',
+            configuration: { purpose: 'handwritten numeric marks only' },
+          },
+        });
+      }
+      const items = template.cells.map((cell) => {
+        const item = sheet.markingSchemeVersion.items.find(
+          (candidate) =>
+            candidate.isScorable &&
+            candidate.question?.code === cell.questionCode &&
+            (candidate.questionPart?.code ?? undefined) ===
+              cell.questionPartCode,
+        );
+        if (!item || !item.questionId)
+          throw new BadRequestException(
+            `No scorable marking-scheme item matches template cell ${cell.questionCode}`,
+          );
+        return { cell, item };
+      });
+      await tx.markSheet.update({
+        where: { id },
+        data: { status: MarkSheetStatus.PROCESSING },
+      });
+      return { sheet, image, template, model, items };
+    });
+    if (!context) return uploaded;
+    const thresholds = context.sheet.markingSchemeVersion
+      .confidenceThresholds as Record<string, number>;
+    const payload = {
+      context: {
+        tenant_id: actor.tenantId,
+        mark_sheet_id: id,
+        image_id: context.image.id,
+        question_paper_version_id: context.sheet.questionPaperVersionId,
+        marking_scheme_version_id: context.sheet.markingSchemeVersionId,
+      },
+      source: {
+        bucket: context.image.fileObject.bucket,
+        object_key: context.image.fileObject.objectKey,
+        mime_type: context.image.fileObject.mimeType,
+        size_bytes: Number(context.image.fileObject.sizeBytes),
+        checksum_sha256: context.image.fileObject.checksumSha256,
+      },
+      template: {
+        template_id: context.sheet.questionPaperVersionId,
+        version: context.sheet.questionPaperVersion.version,
+        expected_aspect_ratio: context.template.expectedAspectRatio,
+        aspect_ratio_tolerance: context.template.aspectRatioTolerance,
+        cells: context.items.map(({ cell, item }) => ({
+          marking_scheme_item_id: item.id,
+          question_id: item.questionId,
+          question_part_id: item.questionPartId,
+          label: item.questionPart
+            ? `${item.question!.code}.${item.questionPart.code}`
+            : item.question!.code,
+          maximum_mark: Number(item.maximumMark),
+          box: cell.box,
+        })),
+      },
+      confidence_thresholds: {
+        auto_accept: Number(
+          thresholds.autoAccept ?? thresholds.auto_accept ?? 0.95,
+        ),
+        review_recommended: Number(
+          thresholds.reviewRecommended ?? thresholds.review_recommended ?? 0.8,
+        ),
+        review_required: Number(
+          thresholds.reviewRequired ?? thresholds.review_required ?? 0.6,
+        ),
+      },
+      model_version_id: context.model.id,
+    };
+    try {
+      const baseUrl =
+        this.config.get<string>('AI_SERVICE_URL') ?? 'http://ai-service:8000';
+      const response = await fetch(
+        `${baseUrl.replace(/\/$/, '')}/ai/extract-marks`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'X-AI-Service-Key': this.config.getOrThrow<string>(
+              'AI_INTERNAL_API_KEY',
+            ),
+          },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(120_000),
+        },
+      );
+      if (!response.ok)
+        throw new Error(
+          `AI service returned HTTP ${response.status}: ${(await response.text()).slice(0, 500)}`,
+        );
+      const result = (await response.json()) as {
+        marks: Array<{
+          marking_scheme_item_id: string;
+          raw_text?: string;
+          value?: number;
+          confidence: number;
+          status: string;
+          bounding_box: Record<string, unknown>;
+        }>;
+      };
+      await this.ingest(
+        id,
+        {
+          sourceImageId: context.image.id,
+          aiModelVersionId: context.model.id,
+          marks: result.marks.map((mark) => ({
+            markingSchemeItemId: mark.marking_scheme_item_id,
+            rawText: mark.raw_text,
+            value: mark.value,
+            confidence: mark.confidence,
+            status: mark.status as never,
+            boundingBox: mark.bounding_box,
+          })),
+        },
+        actor,
+      );
+      return { markSheetId: id, status: MarkSheetStatus.REVIEW_REQUIRED };
+    } catch (error) {
+      await this.tenant.transaction(this.prisma, (tx) =>
+        tx.markSheet.updateMany({
+          where: {
+            id,
+            tenantId: actor.tenantId,
+            status: MarkSheetStatus.PROCESSING,
+          },
+          data: { status: MarkSheetStatus.UPLOADED },
+        }),
+      );
+      throw new ServiceUnavailableException(
+        `Numeric mark extraction failed: ${error instanceof Error ? error.message : 'unknown AI error'}`,
+      );
+    }
+  }
 
   ingest(id: string, dto: IngestExtractionDto, actor: AccessClaims) {
     return this.tenant.transaction(this.prisma, async (tx) => {
