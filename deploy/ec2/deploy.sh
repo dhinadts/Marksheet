@@ -15,6 +15,33 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+ensure_secret() {
+  local name="$1"
+  local current
+  current=$(grep -E "^${name}=" .env | tail -n 1 | cut -d= -f2- || true)
+  if [[ -n "$current" && "$current" != REPLACE_* && "$current" != change-me* ]]; then
+    export "${name}=${current}"
+    return
+  fi
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "${name} is missing and openssl is unavailable. Set ${name} in .env." >&2
+    exit 1
+  fi
+  local generated
+  generated=$(openssl rand -hex 32)
+  if grep -qE "^${name}=" .env; then
+    sed -i -E "s|^${name}=.*$|${name}=${generated}|" .env
+  else
+    printf '\n%s=%s\n' "$name" "$generated" >> .env
+  fi
+  export "${name}=${generated}"
+  echo "Generated and saved ${name} in .env."
+}
+
+# Backend and AI service authenticate internal requests with the same persisted
+# secret. Generate it once when an older deployment .env does not contain it.
+ensure_secret AI_INTERNAL_API_KEY
+
 database_url=$(grep '^DATABASE_URL=' .env | cut -d= -f2- || true)
 if [[ -z "$database_url" ]]; then
   echo "DATABASE_URL is missing from .env." >&2
