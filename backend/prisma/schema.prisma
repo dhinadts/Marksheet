@@ -128,80 +128,83 @@ enum NotificationStatus {
 }
 
 model Tenant {
-  id                    String                 @id @default(uuid()) @db.Uuid
-  code                  String                 @unique @db.VarChar(50)
-  name                  String                 @db.VarChar(200)
-  status                RecordStatus           @default(ACTIVE)
-  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
-  users                 User[]
-  roles                 Role[]
-  universities          University[]
-  colleges              College[]
-  departments           Department[]
-  programs              Program[]
-  academicYears         AcademicYear[]
-  studyYears            StudyYear[]
-  semesters             Semester[]
-  classes               AcademicClass[]
-  sections              Section[]
-  students              Student[]
-  subjects              Subject[]
-  subjectOfferings      SubjectOffering[]
-  questionPapers        QuestionPaper[]
-  questionPaperVersions QuestionPaperVersion[]
-  questions             Question[]
-  questionParts         QuestionPart[]
-  markingSchemes        MarkingScheme[]
-  markingSchemeVersions MarkingSchemeVersion[]
-  markingSchemeItems    MarkingSchemeItem[]
-  markSheets            MarkSheet[]
-  markSheetImages       MarkSheetImage[]
-  extractedMarks        ExtractedMark[]
-  markValues            MarkValue[]
-  verificationSessions  VerificationSession[]
-  verificationItems     VerificationItem[]
-  calculationResults    CalculationResult[]
-  auditLogs             AuditLog[]
-  processingJobs        ProcessingJob[]
-  aiModelVersions       AiModelVersion[]
-  fileObjects           FileObject[]
-  exports               Export[]
-  notifications         Notification[]
-  authSessions          AuthSession[]
-  userRoles             UserRole[]
-  rolePermissions       RolePermission[]
+  id                          String                       @id @default(uuid()) @db.Uuid
+  code                        String                       @unique @db.VarChar(50)
+  name                        String                       @db.VarChar(200)
+  status                      RecordStatus                 @default(ACTIVE)
+  createdAt                   DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                   DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  users                       User[]
+  roles                       Role[]
+  universities                University[]
+  colleges                    College[]
+  departments                 Department[]
+  programs                    Program[]
+  academicYears               AcademicYear[]
+  studyYears                  StudyYear[]
+  semesters                   Semester[]
+  classes                     AcademicClass[]
+  sections                    Section[]
+  students                    Student[]
+  subjects                    Subject[]
+  subjectOfferings            SubjectOffering[]
+  questionPapers              QuestionPaper[]
+  questionPaperVersions       QuestionPaperVersion[]
+  questions                   Question[]
+  questionParts               QuestionPart[]
+  markingSchemes              MarkingScheme[]
+  markingSchemeVersions       MarkingSchemeVersion[]
+  markingSchemeItems          MarkingSchemeItem[]
+  markSheets                  MarkSheet[]
+  markSheetImages             MarkSheetImage[]
+  extractedMarks              ExtractedMark[]
+  markValues                  MarkValue[]
+  verificationSessions        VerificationSession[]
+  verificationItems           VerificationItem[]
+  calculationResults          CalculationResult[]
+  auditLogs                   AuditLog[]
+  processingJobs              ProcessingJob[]
+  aiModelVersions             AiModelVersion[]
+  fileObjects                 FileObject[]
+  exports                     Export[]
+  notifications               Notification[]
+  authSessions                AuthSession[]
+  userRoles                   UserRole[]
+  rolePermissions             RolePermission[]
+  departmentAcademicYears     DepartmentAcademicYear[]
+  professorSubjectAssignments ProfessorSubjectAssignment[]
 
   @@map("tenants")
 }
 
 model User {
-  id                             String                 @id @default(uuid()) @db.Uuid
-  tenantId                       String                 @map("tenant_id") @db.Uuid
-  username                       String                 @unique @db.VarChar(50)
-  email                          String                 @db.VarChar(320)
-  passwordHash                   String?                @map("password_hash") @db.VarChar(255)
-  displayName                    String                 @map("display_name") @db.VarChar(150)
-  status                         RecordStatus           @default(ACTIVE)
-  failedLoginAttempts            Int                    @default(0) @map("failed_login_attempts")
-  lockedUntil                    DateTime?              @map("locked_until") @db.Timestamptz(6)
-  lastLoginAt                    DateTime?              @map("last_login_at") @db.Timestamptz(6)
-  tokenVersion                   Int                    @default(0) @map("token_version")
-  createdAt                      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                      DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenant                         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id                             String                       @id @default(uuid()) @db.Uuid
+  tenantId                       String                       @map("tenant_id") @db.Uuid
+  username                       String                       @unique @db.VarChar(50)
+  email                          String                       @db.VarChar(320)
+  passwordHash                   String?                      @map("password_hash") @db.VarChar(255)
+  displayName                    String                       @map("display_name") @db.VarChar(150)
+  status                         RecordStatus                 @default(ACTIVE)
+  failedLoginAttempts            Int                          @default(0) @map("failed_login_attempts")
+  lockedUntil                    DateTime?                    @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt                    DateTime?                    @map("last_login_at") @db.Timestamptz(6)
+  tokenVersion                   Int                          @default(0) @map("token_version")
+  createdAt                      DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                      DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant                         Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   userRoles                      UserRole[]
-  createdQuestionPaperVersions   QuestionPaperVersion[] @relation("QuestionPaperVersionCreatedBy")
-  publishedQuestionPaperVersions QuestionPaperVersion[] @relation("QuestionPaperVersionPublishedBy")
-  createdSchemeVersions          MarkingSchemeVersion[] @relation("SchemeVersionCreatedBy")
-  publishedSchemeVersions        MarkingSchemeVersion[] @relation("SchemeVersionPublishedBy")
+  createdQuestionPaperVersions   QuestionPaperVersion[]       @relation("QuestionPaperVersionCreatedBy")
+  publishedQuestionPaperVersions QuestionPaperVersion[]       @relation("QuestionPaperVersionPublishedBy")
+  createdSchemeVersions          MarkingSchemeVersion[]       @relation("SchemeVersionCreatedBy")
+  publishedSchemeVersions        MarkingSchemeVersion[]       @relation("SchemeVersionPublishedBy")
   markValues                     MarkValue[]
-  verificationSessions           VerificationSession[]  @relation("VerificationAssignedTo")
-  completedVerificationSessions  VerificationSession[]  @relation("VerificationCompletedBy")
+  verificationSessions           VerificationSession[]        @relation("VerificationAssignedTo")
+  completedVerificationSessions  VerificationSession[]        @relation("VerificationCompletedBy")
   auditLogs                      AuditLog[]
   requestedExports               Export[]
   notifications                  Notification[]
   authSessions                   AuthSession[]
+  subjectAssignments             ProfessorSubjectAssignment[]
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -326,19 +329,20 @@ model College {
 }
 
 model Department {
-  id        String       @id @default(uuid()) @db.Uuid
-  tenantId  String       @map("tenant_id") @db.Uuid
-  collegeId String       @map("college_id") @db.Uuid
-  code      String       @db.VarChar(50)
-  name      String       @db.VarChar(200)
-  status    RecordStatus @default(ACTIVE)
-  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenant    Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  college   College      @relation(fields: [collegeId], references: [id], onDelete: Restrict)
-  programs  Program[]
-  students  Student[]
-  subjects  Subject[]
+  id            String                   @id @default(uuid()) @db.Uuid
+  tenantId      String                   @map("tenant_id") @db.Uuid
+  collegeId     String                   @map("college_id") @db.Uuid
+  code          String                   @db.VarChar(50)
+  name          String                   @db.VarChar(200)
+  status        RecordStatus             @default(ACTIVE)
+  createdAt     DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant        Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  college       College                  @relation(fields: [collegeId], references: [id], onDelete: Restrict)
+  programs      Program[]
+  students      Student[]
+  subjects      Subject[]
+  academicYears DepartmentAcademicYear[]
 
   @@unique([tenantId, collegeId, code])
   @@index([tenantId, collegeId])
@@ -346,19 +350,20 @@ model Department {
 }
 
 model Program {
-  id               String            @id @default(uuid()) @db.Uuid
-  tenantId         String            @map("tenant_id") @db.Uuid
-  departmentId     String            @map("department_id") @db.Uuid
-  code             String            @db.VarChar(50)
-  name             String            @db.VarChar(200)
-  status           RecordStatus      @default(ACTIVE)
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  department       Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  id               String                   @id @default(uuid()) @db.Uuid
+  tenantId         String                   @map("tenant_id") @db.Uuid
+  departmentId     String                   @map("department_id") @db.Uuid
+  code             String                   @db.VarChar(50)
+  name             String                   @db.VarChar(200)
+  status           RecordStatus             @default(ACTIVE)
+  createdAt        DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant           Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  department       Department               @relation(fields: [departmentId], references: [id], onDelete: Restrict)
   classes          AcademicClass[]
   students         Student[]
   subjectOfferings SubjectOffering[]
+  departments      DepartmentAcademicYear[]
 
   @@unique([tenantId, departmentId, code])
   @@index([tenantId, departmentId])
@@ -366,18 +371,19 @@ model Program {
 }
 
 model AcademicYear {
-  id               String            @id @default(uuid()) @db.Uuid
-  tenantId         String            @map("tenant_id") @db.Uuid
-  code             String            @db.VarChar(30)
-  startsOn         DateTime          @map("starts_on") @db.Date
-  endsOn           DateTime          @map("ends_on") @db.Date
-  status           RecordStatus      @default(ACTIVE)
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  semesters        Semester[]
-  classes          AcademicClass[]
-  subjectOfferings SubjectOffering[]
+  id                      String                   @id @default(uuid()) @db.Uuid
+  tenantId                String                   @map("tenant_id") @db.Uuid
+  code                    String                   @db.VarChar(30)
+  startsOn                DateTime                 @map("starts_on") @db.Date
+  endsOn                  DateTime                 @map("ends_on") @db.Date
+  status                  RecordStatus             @default(ACTIVE)
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  semesters               Semester[]
+  classes                 AcademicClass[]
+  subjectOfferings        SubjectOffering[]
+  departmentAcademicYears DepartmentAcademicYear[]
 
   @@unique([tenantId, code])
   @@map("academic_years")
@@ -459,22 +465,23 @@ model Section {
 }
 
 model Student {
-  id             String       @id @default(uuid()) @db.Uuid
-  tenantId       String       @map("tenant_id") @db.Uuid
-  departmentId   String       @map("department_id") @db.Uuid
-  programId      String       @map("program_id") @db.Uuid
-  sectionId      String       @map("section_id") @db.Uuid
-  registerNumber String       @map("register_number") @db.VarChar(80)
-  fullName       String       @map("full_name") @db.VarChar(200)
-  email          String?      @db.VarChar(320)
-  status         RecordStatus @default(ACTIVE)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  department     Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  program        Program      @relation(fields: [programId], references: [id], onDelete: Restrict)
-  section        Section      @relation(fields: [sectionId], references: [id], onDelete: Restrict)
-  markSheets     MarkSheet[]
+  id                   String                       @id @default(uuid()) @db.Uuid
+  tenantId             String                       @map("tenant_id") @db.Uuid
+  departmentId         String                       @map("department_id") @db.Uuid
+  programId            String                       @map("program_id") @db.Uuid
+  sectionId            String                       @map("section_id") @db.Uuid
+  registerNumber       String                       @map("register_number") @db.VarChar(80)
+  fullName             String                       @map("full_name") @db.VarChar(200)
+  email                String?                      @db.VarChar(320)
+  status               RecordStatus                 @default(ACTIVE)
+  createdAt            DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant               Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  department           Department                   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  program              Program                      @relation(fields: [programId], references: [id], onDelete: Restrict)
+  section              Section                      @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  markSheets           MarkSheet[]
+  professorAssignments ProfessorSubjectAssignment[]
 
   @@unique([tenantId, registerNumber])
   @@index([tenantId, sectionId, status])
@@ -501,27 +508,66 @@ model Subject {
 }
 
 model SubjectOffering {
-  id             String       @id @default(uuid()) @db.Uuid
-  tenantId       String       @map("tenant_id") @db.Uuid
-  subjectId      String       @map("subject_id") @db.Uuid
-  programId      String       @map("program_id") @db.Uuid
-  academicYearId String       @map("academic_year_id") @db.Uuid
-  semesterId     String       @map("semester_id") @db.Uuid
-  sectionId      String       @map("section_id") @db.Uuid
-  status         RecordStatus @default(ACTIVE)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  subject        Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  program        Program      @relation(fields: [programId], references: [id], onDelete: Restrict)
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
-  semester       Semester     @relation(fields: [semesterId], references: [id], onDelete: Restrict)
-  section        Section      @relation(fields: [sectionId], references: [id], onDelete: Restrict)
-  markSheets     MarkSheet[]
+  id                          String                       @id @default(uuid()) @db.Uuid
+  tenantId                    String                       @map("tenant_id") @db.Uuid
+  subjectId                   String                       @map("subject_id") @db.Uuid
+  programId                   String                       @map("program_id") @db.Uuid
+  academicYearId              String                       @map("academic_year_id") @db.Uuid
+  semesterId                  String                       @map("semester_id") @db.Uuid
+  sectionId                   String                       @map("section_id") @db.Uuid
+  status                      RecordStatus                 @default(ACTIVE)
+  createdAt                   DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                   DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant                      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  subject                     Subject                      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  program                     Program                      @relation(fields: [programId], references: [id], onDelete: Restrict)
+  academicYear                AcademicYear                 @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  semester                    Semester                     @relation(fields: [semesterId], references: [id], onDelete: Restrict)
+  section                     Section                      @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  markSheets                  MarkSheet[]
+  professorSubjectAssignments ProfessorSubjectAssignment[]
 
   @@unique([tenantId, subjectId, academicYearId, sectionId])
   @@index([tenantId, sectionId])
   @@map("subject_offerings")
+}
+
+model DepartmentAcademicYear {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  departmentId   String       @map("department_id") @db.Uuid
+  academicYearId String       @map("academic_year_id") @db.Uuid
+  status         RecordStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  department     Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Restrict)
+  program        Program?     @relation(fields: [programId], references: [id])
+  programId      String?      @db.Uuid
+
+  @@unique([tenantId, departmentId, academicYearId])
+  @@index([tenantId, academicYearId, status])
+  @@map("department_academic_years")
+}
+
+model ProfessorSubjectAssignment {
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  professorId       String          @map("professor_id") @db.Uuid
+  subjectOfferingId String          @map("subject_offering_id") @db.Uuid
+  status            RecordStatus    @default(ACTIVE)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  professor         User            @relation(fields: [professorId], references: [id], onDelete: Restrict)
+  subjectOffering   SubjectOffering @relation(fields: [subjectOfferingId], references: [id], onDelete: Restrict)
+  student           Student?        @relation(fields: [studentId], references: [id])
+  studentId         String?         @db.Uuid
+
+  @@unique([tenantId, professorId, subjectOfferingId])
+  @@index([tenantId, professorId, status])
+  @@map("professor_subject_assignments")
 }
 
 model QuestionPaper {

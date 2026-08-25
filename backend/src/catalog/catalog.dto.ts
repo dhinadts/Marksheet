@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 
 export class CatalogRecordDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(50) username?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) code?: string;
   @ApiPropertyOptional()
   @IsOptional()
@@ -49,6 +50,8 @@ export class CatalogRecordDto {
   @ApiPropertyOptional() @IsOptional() @IsUUID() classId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() sectionId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() subjectId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() professorId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsUUID() subjectOfferingId?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) ordinal?: number;
   @ApiPropertyOptional() @IsOptional() @IsDateString() startsOn?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() endsOn?: string;

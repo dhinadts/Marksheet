@@ -33,6 +33,13 @@ type Config = {
 };
 
 const configs: Readonly<Record<string, Config>> = {
+  professors: {
+    model: 'user',
+    fields: ['username', 'email', 'displayName'],
+    required: ['username', 'email', 'displayName'],
+    parents: {},
+    search: ['username', 'email', 'displayName'],
+  },
   universities: {
     model: 'university',
     fields: ['code', 'name'],
@@ -63,8 +70,8 @@ const configs: Readonly<Record<string, Config>> = {
   },
   'academic-years': {
     model: 'academicYear',
-    fields: ['code', 'name', 'startsOn', 'endsOn'],
-    required: ['code', 'name', 'startsOn', 'endsOn'],
+    fields: ['code', 'startsOn', 'endsOn'],
+    required: ['code', 'startsOn', 'endsOn'],
     parents: {},
     search: ['code', 'name'],
   },
@@ -169,6 +176,20 @@ const configs: Readonly<Record<string, Config>> = {
       semesterId: 'semester',
       sectionId: 'section',
     },
+    search: [],
+  },
+  'department-academic-years': {
+    model: 'departmentAcademicYear',
+    fields: ['departmentId', 'academicYearId'],
+    required: ['departmentId', 'academicYearId'],
+    parents: { departmentId: 'department', academicYearId: 'academicYear' },
+    search: [],
+  },
+  'professor-subject-assignments': {
+    model: 'professorSubjectAssignment',
+    fields: ['professorId', 'subjectOfferingId'],
+    required: ['professorId', 'subjectOfferingId'],
+    parents: { professorId: 'user', subjectOfferingId: 'subjectOffering' },
     search: [],
   },
 };
