@@ -9,12 +9,10 @@ class CapturedSheetDetailScreen extends ConsumerStatefulWidget {
   final String markSheetId;
 
   @override
-  ConsumerState<CapturedSheetDetailScreen> createState() =>
-      _CapturedSheetDetailScreenState();
+  ConsumerState<CapturedSheetDetailScreen> createState() => _DetailState();
 }
 
-class _CapturedSheetDetailScreenState
-    extends ConsumerState<CapturedSheetDetailScreen> {
+class _DetailState extends ConsumerState<CapturedSheetDetailScreen> {
   Timer? timer;
   late Future<MarkSheetDetail> detail;
 
@@ -27,9 +25,12 @@ class _CapturedSheetDetailScreenState
 
   Future<MarkSheetDetail> _load() =>
       ref.read(markSheetRepositoryProvider).detail(widget.markSheetId);
-
   void _refresh() {
-    if (mounted) setState(() => detail = _load());
+    if (mounted) {
+      setState(() {
+        detail = _load();
+      });
+    }
   }
 
   @override
@@ -43,11 +44,7 @@ class _CapturedSheetDetailScreenState
     appBar: AppBar(
       title: const Text('Captured mark sheet'),
       actions: [
-        IconButton(
-          tooltip: 'Refresh',
-          onPressed: _refresh,
-          icon: const Icon(Icons.refresh),
-        ),
+        IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh)),
       ],
     ),
     body: FutureBuilder<MarkSheetDetail>(
@@ -58,13 +55,7 @@ class _CapturedSheetDetailScreenState
         }
         if (snapshot.hasError) {
           return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                'Could not load extracted marks.\n${snapshot.error}',
-                textAlign: TextAlign.center,
-              ),
-            ),
+            child: Text('Could not load marks.\n${snapshot.error}'),
           );
         }
         final sheet = snapshot.requireData;
@@ -81,19 +72,14 @@ class _CapturedSheetDetailScreenState
                 ),
               ),
             const SizedBox(height: 16),
-            Text(
-              sheet.student.isEmpty ? 'Captured mark sheet' : sheet.student,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text(sheet.student, style: Theme.of(context).textTheme.titleLarge),
             Text(sheet.subject),
-            if (sheet.hierarchy.isNotEmpty) ...[
-              const SizedBox(height: 4),
+            if (sheet.hierarchy.isNotEmpty)
               Text(
                 sheet.hierarchy,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             if (sheet.marks.isEmpty)
               Card(
                 child: Padding(
@@ -106,27 +92,33 @@ class _CapturedSheetDetailScreenState
                 ),
               )
             else ...[
-              ...sheet.marks.map(
-                (mark) => Card(
-                  child: ListTile(
-                    title: Text(mark.label),
-                    subtitle: Text(mark.status.replaceAll('_', ' ')),
-                    trailing: Text(
-                      mark.value == null
-                          ? '— / ${_format(mark.maximum)}'
-                          : '${_format(mark.value!)} / ${_format(mark.maximum)}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
+              Text(
+                'Question-wise marks',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: Table(
+                  columnWidths: const {
+                    0: FlexColumnWidth(2.2),
+                    1: FlexColumnWidth(1.2),
+                    2: FlexColumnWidth(1.2),
+                  },
+                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  children: [
+                    _header(context),
+                    ...sheet.marks.map((mark) => _row(context, mark)),
+                  ],
                 ),
               ),
               Card(
                 color: Theme.of(context).colorScheme.primaryContainer,
                 child: ListTile(
-                  title: const Text('Total'),
+                  title: const Text('Total obtained'),
                   subtitle: Text(
                     sheet.isComplete
-                        ? 'Computer-calculated total${sheet.calculationVersion == null ? '' : ' • Version ${sheet.calculationVersion}'}'
+                        ? 'Computer-calculated total'
                         : 'Incomplete — review required',
                   ),
                   trailing: Text(
@@ -145,4 +137,47 @@ class _CapturedSheetDetailScreenState
   static String _format(double value) => value == value.roundToDouble()
       ? value.toInt().toString()
       : value.toStringAsFixed(2);
+
+  static TableRow _header(BuildContext context) => TableRow(
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    ),
+    children: const [
+      _Cell('Question', bold: true),
+      _Cell('Obtained', bold: true, centered: true),
+      _Cell('Maximum', bold: true, centered: true),
+    ],
+  );
+
+  static TableRow _row(BuildContext context, DisplayMark mark) => TableRow(
+    decoration: BoxDecoration(
+      border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+    ),
+    children: [
+      _Cell(mark.label),
+      _Cell(
+        mark.value == null ? '—' : _format(mark.value!),
+        bold: true,
+        centered: true,
+      ),
+      _Cell(_format(mark.maximum), centered: true),
+    ],
+  );
+}
+
+class _Cell extends StatelessWidget {
+  const _Cell(this.text, {this.bold = false, this.centered = false});
+  final String text;
+  final bool bold;
+  final bool centered;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+    child: Text(
+      text,
+      textAlign: centered ? TextAlign.center : TextAlign.start,
+      style: TextStyle(fontWeight: bold ? FontWeight.w700 : null),
+    ),
+  );
 }

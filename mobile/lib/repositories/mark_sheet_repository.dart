@@ -5,6 +5,7 @@ class DisplayMark {
     required this.label,
     required this.maximum,
     required this.status,
+    required this.displayOrder,
     this.value,
     this.confidence,
   });
@@ -14,6 +15,7 @@ class DisplayMark {
   final double maximum;
   final double? confidence;
   final String status;
+  final int displayOrder;
 }
 
 class MarkSheetDetail {
@@ -80,13 +82,16 @@ class MarkSheetRepository {
     final academicYear = Map<String, dynamic>.from(
       academicClass['academicYear'] as Map? ?? const {},
     );
-    final hierarchy = [
-      college['name'],
-      department['name'],
-      academicYear['code'],
-      academicClass['name'],
-      section['name'],
-    ].where((value) => value != null && value.toString().isNotEmpty).join(' • ');
+    final hierarchy =
+        [
+              college['name'],
+              department['name'],
+              academicYear['code'],
+              academicClass['name'],
+              section['name'],
+            ]
+            .where((value) => value != null && value.toString().isNotEmpty)
+            .join(' • ');
     final sessions = (json['verificationSessions'] as List? ?? const []);
     final items = sessions.isEmpty
         ? const <dynamic>[]
@@ -107,11 +112,12 @@ class MarkSheetRepository {
       final selected = item['selectedMarkValue'] == null
           ? null
           : Map<String, dynamic>.from(item['selectedMarkValue'] as Map);
-      final label = [question['number'], part['label']]
+      final label = [question['label'] ?? question['code'], part['label']]
           .where((value) => value != null && value.toString().isNotEmpty)
           .join(' ');
       return DisplayMark(
         label: label.isEmpty ? 'Mark' : label,
+        displayOrder: (scheme['displayOrder'] as num?)?.toInt() ?? 0,
         value: _number(selected?['value'] ?? extracted['extractedValue']),
         maximum: _number(scheme['maximumMark']) ?? 0,
         confidence: _number(extracted['confidence']),
@@ -120,7 +126,7 @@ class MarkSheetRepository {
             extracted['extractionStatus']?.toString() ??
             'PENDING',
       );
-    }).toList();
+    }).toList()..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
     final images = json['images'] as List? ?? const [];
     final calculations = json['calculationResults'] as List? ?? const [];
     final latestCalculation = calculations.isEmpty
