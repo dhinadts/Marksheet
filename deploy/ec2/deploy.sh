@@ -93,7 +93,10 @@ fi
 
 echo "Starting backend..."
 
-docker compose up -d --build backend
+# Build only this image. `up --build backend` also rebuilds every dependency
+# (PostgreSQL, Redis and AI service) on some Compose versions.
+docker compose --progress plain build backend
+docker compose up -d --no-deps --force-recreate backend
 
 echo "Waiting for backend to become healthy..."
 for i in {1..30}; do
@@ -115,7 +118,10 @@ done
 
 echo "Starting frontend..."
 
-docker compose up -d --build frontend
+# Next.js compilation can take several minutes on small EC2 instances. Keep the
+# output visible and do not rebuild backend or its dependencies a second time.
+docker compose --progress plain build frontend
+docker compose up -d --no-deps --force-recreate frontend
 
 if command -v nginx >/dev/null 2>&1; then
   echo "Enabling Marksheet Nginx site..."
