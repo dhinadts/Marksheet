@@ -16,6 +16,39 @@ class DisplayMark {
   final double? confidence;
   final String status;
   final int displayOrder;
+
+  bool get needsVerification =>
+      value == null ||
+      !const {'accepted', 'AUTO_ACCEPT', 'VERIFIED'}.contains(status);
+}
+
+List<DisplayMark> parseCanonicalQuestionMarks(Map<String, dynamic> json) {
+  final result = json['questionWiseResult'];
+  if (result is! Map) return const [];
+  final canonical = Map<String, dynamic>.from(result);
+  final entries = <dynamic>[
+    ...(Map<String, dynamic>.from(
+              canonical['partA'] as Map? ?? const {},
+            )['questions']
+            as List? ??
+        const []),
+    ...(Map<String, dynamic>.from(
+              canonical['partBC'] as Map? ?? const {},
+            )['questions']
+            as List? ??
+        const []),
+  ];
+  return entries.map((entry) {
+    final mark = Map<String, dynamic>.from(entry as Map);
+    return DisplayMark(
+      label: mark['label']?.toString() ?? 'Question ${mark['question'] ?? ''}',
+      value: MarkSheetRepository.number(mark['obtained']),
+      maximum: MarkSheetRepository.number(mark['maximum']) ?? 0,
+      confidence: MarkSheetRepository.number(mark['confidence']),
+      status: mark['status']?.toString() ?? 'needs_review',
+      displayOrder: (mark['displayOrder'] as num?)?.toInt() ?? 0,
+    );
+  }).toList()..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
 }
 
 class MarkSheetDetail {
@@ -53,6 +86,16 @@ class MarkSheetDetail {
       : (storedMaximum ?? 0);
   bool get isComplete =>
       marks.isNotEmpty && marks.every((mark) => mark.value != null);
+  bool get partAComplete =>
+      _partMarks(partA: true).isNotEmpty &&
+      _partMarks(partA: true).every((mark) => mark.value != null);
+  bool get partBCComplete =>
+      _partMarks(partA: false).isNotEmpty &&
+      _partMarks(partA: false).every((mark) => mark.value != null);
+  double get partAMaximum =>
+      _partMarks(partA: true).fold(0, (sum, mark) => sum + mark.maximum);
+  double get partBCMaximum =>
+      _partMarks(partA: false).fold(0, (sum, mark) => sum + mark.maximum);
 
   double get partATotal => marks
       .where((mark) {
@@ -74,6 +117,12 @@ class MarkSheetDetail {
     ).firstMatch(label);
     return match == null ? null : int.tryParse(match.group(1)!);
   }
+
+  Iterable<DisplayMark> _partMarks({required bool partA}) =>
+      marks.where((mark) {
+        final number = _questionNumber(mark.label);
+        return number != null && (partA ? number <= 10 : number >= 11);
+      });
 }
 
 class MarkSheetRepository {
@@ -124,7 +173,8 @@ class MarkSheetRepository {
         ? const <dynamic>[]
         : (Map<String, dynamic>.from(sessions.first as Map)['items'] as List? ??
               const []);
-    final marks = items.map((entry) {
+    final canonicalMarks = parseCanonicalQuestionMarks(json);
+    final legacyMarks = items.map((entry) {
       final item = Map<String, dynamic>.from(entry as Map);
       final extracted = Map<String, dynamic>.from(item['extractedMark'] as Map);
       final scheme = Map<String, dynamic>.from(
@@ -154,6 +204,7 @@ class MarkSheetRepository {
             'PENDING',
       );
     }).toList()..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
+    final marks = canonicalMarks.isNotEmpty ? canonicalMarks : legacyMarks;
     final images = json['images'] as List? ?? const [];
     final calculations = json['calculationResults'] as List? ?? const [];
     final latestCalculation = calculations.isEmpty
@@ -176,6 +227,8 @@ class MarkSheetRepository {
     );
   }
 
-  static double? _number(dynamic value) =>
+  static double? number(dynamic value) =>
       value == null ? null : double.tryParse(value.toString());
+
+  static double? _number(dynamic value) => number(value);
 }

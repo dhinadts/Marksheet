@@ -2,6 +2,43 @@ import 'package:ai_marks_mobile/repositories/mark_sheet_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('canonical API mapping preserves zero, strings, and null', () {
+    final marks = parseCanonicalQuestionMarks({
+      'questionWiseResult': {
+        'partA': {
+          'questions': [
+            {
+              'question': 1,
+              'label': 'Question 1',
+              'obtained': 0,
+              'maximum': 2,
+              'displayOrder': 1,
+            },
+            {
+              'question': 2,
+              'label': 'Question 2',
+              'obtained': '2',
+              'maximum': '2',
+              'displayOrder': 2,
+            },
+            {
+              'question': 3,
+              'label': 'Question 3',
+              'obtained': null,
+              'maximum': 2,
+              'displayOrder': 3,
+            },
+          ],
+        },
+        'partBC': {'questions': []},
+      },
+    });
+
+    expect(marks.map((mark) => mark.value).toList(), [0, 2, null]);
+    expect(marks.first.value, 0);
+    expect(marks.last.needsVerification, isTrue);
+  });
+
   test('captured totals use the extracted marks shown to the reviewer', () {
     const sheet = MarkSheetDetail(
       status: 'REVIEW_REQUIRED',

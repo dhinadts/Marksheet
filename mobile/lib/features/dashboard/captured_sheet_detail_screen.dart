@@ -112,17 +112,26 @@ class _DetailState extends ConsumerState<CapturedSheetDetailScreen> {
                   ],
                 ),
               ),
+              if (sheet.marks.any((mark) => mark.needsVerification))
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text('* Needs verification'),
+                ),
               Card(
                 child: Column(
                   children: [
                     ListTile(
                       title: const Text('Part A total'),
-                      trailing: Text(_format(sheet.partATotal)),
+                      trailing: Text(
+                        '${sheet.partAComplete ? _format(sheet.partATotal) : '—'} / ${_format(sheet.partAMaximum)}',
+                      ),
                     ),
                     const Divider(height: 1),
                     ListTile(
                       title: const Text('Part B & C total'),
-                      trailing: Text(_format(sheet.partBCTotal)),
+                      trailing: Text(
+                        '${sheet.partBCComplete ? _format(sheet.partBCTotal) : '—'} / ${_format(sheet.partBCMaximum)}',
+                      ),
                     ),
                   ],
                 ),
@@ -171,7 +180,9 @@ class _DetailState extends ConsumerState<CapturedSheetDetailScreen> {
     children: [
       _Cell(mark.label),
       _Cell(
-        mark.value == null ? '—' : _format(mark.value!),
+        mark.value == null
+            ? '—'
+            : '${_format(mark.value!)}${mark.needsVerification ? '*' : ''}',
         bold: true,
         centered: true,
       ),

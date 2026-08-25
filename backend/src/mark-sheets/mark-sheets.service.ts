@@ -24,6 +24,7 @@ import {
   ReviewMarkDto,
   SessionMutationDto,
 } from './mark-sheets.dto';
+import { toQuestionWiseResult } from './question-wise-result';
 
 @Injectable()
 export class MarkSheetsService {
@@ -410,6 +411,9 @@ export class MarkSheetsService {
       if (!sheet) throw new NotFoundException();
       return {
         ...sheet,
+        questionWiseResult: toQuestionWiseResult(
+          sheet.verificationSessions[0]?.items ?? [],
+        ),
         images: sheet.images.map((image) => ({
           id: image.id,
           pageNumber: image.pageNumber,
