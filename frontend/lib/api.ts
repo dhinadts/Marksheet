@@ -1,4 +1,36 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+
+export interface CurrentUser {
+  id: string;
+  tenantId: string;
+  email: string;
+  displayName: string;
+  status: string;
+  lastLoginAt: string | null;
+  professorProfile: {
+    id: string;
+    employeeNumber: string;
+    firstName: string;
+    lastName: string;
+    department: { id: string; code: string; name: string };
+  } | null;
+}
+
+export interface DepartmentStudent {
+  id: string;
+  registerNumber: string;
+  fullName: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string | null;
+  status: string;
+}
+
+export interface DepartmentStudents {
+  department: { id: string; code: string; name: string };
+  students: DepartmentStudent[];
+}
+
 export async function login(username: string, password: string): Promise<void> {
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",

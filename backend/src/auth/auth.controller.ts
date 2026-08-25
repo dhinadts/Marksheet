@@ -46,6 +46,12 @@ export class AuthController {
     return this.auth.currentUser(user);
   }
 
+  @ApiBearerAuth()
+  @Get('me/students')
+  myStudents(@CurrentUser() user: AccessClaims) {
+    return this.auth.myDepartmentStudents(user);
+  }
+
   private metadata(request: AuthenticatedRequest): RequestMetadata {
     const raw = request.headers['user-agent'];
     return {

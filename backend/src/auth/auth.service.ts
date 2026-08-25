@@ -1,5 +1,9 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, RecordStatus } from '@prisma/client';
@@ -216,8 +220,42 @@ export class AuthService {
         displayName: true,
         status: true,
         lastLoginAt: true,
+        professorProfile: {
+          select: {
+            id: true,
+            employeeNumber: true,
+            firstName: true,
+            lastName: true,
+            department: { select: { id: true, code: true, name: true } },
+          },
+        },
       },
     });
+  }
+
+  async myDepartmentStudents(claims: AccessClaims) {
+    const professorProfile = await this.prisma.professorProfile.findUnique({
+      where: { userId: claims.sub },
+      select: { department: { select: { id: true, code: true, name: true } } },
+    });
+    if (!professorProfile)
+      throw new ForbiddenException(
+        'Only professors with a department assignment can view a student roster',
+      );
+    const students = await this.prisma.student.findMany({
+      where: { tenantId: claims.tenantId, departmentId: professorProfile.department.id },
+      select: {
+        id: true,
+        registerNumber: true,
+        fullName: true,
+        firstName: true,
+        lastName: true,
+        dateOfBirth: true,
+        status: true,
+      },
+      orderBy: { registerNumber: 'asc' },
+    });
+    return { department: professorProfile.department, students };
   }
 
   private async issuePair(
