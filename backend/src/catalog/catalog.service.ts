@@ -130,6 +130,9 @@ const configs: Readonly<Record<string, Config>> = {
       'sectionId',
       'registerNumber',
       'fullName',
+      'firstName',
+      'lastName',
+      'dateOfBirth',
       'email',
     ],
     required: [
@@ -138,6 +141,9 @@ const configs: Readonly<Record<string, Config>> = {
       'sectionId',
       'registerNumber',
       'fullName',
+      'firstName',
+      'lastName',
+      'dateOfBirth',
     ],
     parents: {
       departmentId: 'department',
@@ -382,6 +388,9 @@ export class CatalogService {
     const required = [
       'registerNumber',
       'fullName',
+      'firstName',
+      'lastName',
+      'dateOfBirth',
       'departmentId',
       'programId',
       'sectionId',

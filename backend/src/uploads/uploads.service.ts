@@ -154,6 +154,7 @@ export class UploadsService {
           subjectOfferingId: dto.subjectOfferingId,
           questionPaperVersionId: dto.questionPaperVersionId,
           markingSchemeVersionId: dto.markingSchemeVersionId,
+          questionSetNumber: paperVersion.questionPaper.code,
           attempt: dto.attempt,
           status: MarkSheetStatus.PENDING_UPLOAD,
         },

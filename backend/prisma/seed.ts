@@ -211,6 +211,22 @@ async function seedDevelopmentUser(
       update: {},
       create: { tenantId: ids.tenant, userId: user.id, roleId: role.id },
     });
+    await tx.professorProfile.upsert({
+      where: { userId: user.id },
+      update: {
+        departmentId: ids.department,
+        firstName: 'Professor',
+        lastName: index.toString().padStart(2, '0'),
+      },
+      create: {
+        tenantId: ids.tenant,
+        userId: user.id,
+        departmentId: ids.department,
+        employeeNumber: `DEMO-PROF-${index.toString().padStart(3, '0')}`,
+        firstName: 'Professor',
+        lastName: index.toString().padStart(2, '0'),
+      },
+    });
   }
 }
 
@@ -378,13 +394,20 @@ async function seedAcademicStructure(
     },
   });
 
-  for (let index = 1; index <= 20; index += 1) {
+  for (let index = 1; index <= 120; index += 1) {
     const registerNumber = `DEMO25CSE${index.toString().padStart(3, '0')}`;
     await tx.student.upsert({
       where: {
         tenantId_registerNumber: { tenantId: ids.tenant, registerNumber },
       },
-      update: { fullName: `Demo Student ${index.toString().padStart(2, '0')}` },
+      update: {
+        fullName: `Demo Student ${index.toString().padStart(3, '0')}`,
+        firstName: 'Demo',
+        lastName: `Student ${index.toString().padStart(3, '0')}`,
+        dateOfBirth: new Date(
+          `${2004 + (index % 3)}-${((index % 12) + 1).toString().padStart(2, '0')}-${((index % 27) + 1).toString().padStart(2, '0')}T00:00:00.000Z`,
+        ),
+      },
       create: {
         id: uuid(0x200, index),
         tenantId: ids.tenant,
@@ -392,7 +415,12 @@ async function seedAcademicStructure(
         programId: ids.program,
         sectionId: ids.section,
         registerNumber,
-        fullName: `Demo Student ${index.toString().padStart(2, '0')}`,
+        fullName: `Demo Student ${index.toString().padStart(3, '0')}`,
+        firstName: 'Demo',
+        lastName: `Student ${index.toString().padStart(3, '0')}`,
+        dateOfBirth: new Date(
+          `${2004 + (index % 3)}-${((index % 12) + 1).toString().padStart(2, '0')}-${((index % 27) + 1).toString().padStart(2, '0')}T00:00:00.000Z`,
+        ),
       },
     });
   }

@@ -39,6 +39,9 @@ export class CatalogRecordDto {
   @IsString()
   @MaxLength(200)
   fullName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) firstName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) lastName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() dateOfBirth?: string;
   @ApiPropertyOptional() @IsOptional() @IsEmail() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() universityId?: string;
   @ApiPropertyOptional() @IsOptional() @IsUUID() collegeId?: string;
