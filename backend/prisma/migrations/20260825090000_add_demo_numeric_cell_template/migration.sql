@@ -1,6 +1,7 @@
 -- The demo institution uses the printed 16-question valuation sheet. Only
 -- numeric mark/total cells are included: signatures, words and identifiers
 -- are deliberately outside every box.
+ALTER TABLE question_paper_versions DISABLE TRIGGER USER;
 UPDATE question_paper_versions
 SET image_template = '{
   "expectedAspectRatio": 0.769,
@@ -26,9 +27,11 @@ SET image_template = '{
 }'::jsonb
 WHERE id = '00000000-0000-4000-8000-00000000000e'::uuid
   AND image_template IS NULL;
+ALTER TABLE question_paper_versions ENABLE TRIGGER USER;
 
 -- This physical sheet records one total for each of Q11-Q16. Those question
 -- totals are therefore the scorable records; the a/b rows remain metadata.
+ALTER TABLE marking_scheme_items DISABLE TRIGGER USER;
 UPDATE marking_scheme_items
 SET is_scorable = CASE WHEN question_part_id IS NULL THEN true ELSE false END
 WHERE marking_scheme_version_id = '00000000-0000-4000-8000-000000000010'::uuid
@@ -37,3 +40,4 @@ WHERE marking_scheme_version_id = '00000000-0000-4000-8000-000000000010'::uuid
     WHERE question_paper_version_id = '00000000-0000-4000-8000-00000000000e'::uuid
       AND code IN ('Q11','Q12','Q13','Q14','Q15','Q16')
   );
+ALTER TABLE marking_scheme_items ENABLE TRIGGER USER;
