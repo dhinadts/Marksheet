@@ -1,7 +1,7 @@
 -- The demo institution uses the printed 16-question valuation sheet. Only
 -- numeric mark/total cells are included: signatures, words and identifiers
 -- are deliberately outside every box.
-ALTER TABLE question_paper_versions DISABLE TRIGGER USER;
+ALTER TABLE question_paper_versions DISABLE TRIGGER question_paper_versions_immutable;
 UPDATE question_paper_versions
 SET image_template = '{
   "expectedAspectRatio": 0.769,
@@ -27,7 +27,7 @@ SET image_template = '{
 }'::jsonb
 WHERE id = '00000000-0000-4000-8000-00000000000e'::uuid
   AND image_template IS NULL;
-ALTER TABLE question_paper_versions ENABLE TRIGGER USER;
+ALTER TABLE question_paper_versions ENABLE TRIGGER question_paper_versions_immutable;
 
 -- This physical sheet records one total for each of Q11-Q16. Those question
 -- totals are therefore the scorable records; the a/b rows remain metadata.
