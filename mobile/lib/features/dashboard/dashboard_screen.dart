@@ -26,7 +26,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Future<(List<QueuedCapture>, List<CapturedMarkSheet>)> _load() async =>
       (await queue.read(), await queue.readHistory());
 
-  void _refresh() => setState(() => captures = _load());
+  void _refresh() => setState(() {
+    captures = _load();
+  });
 
   Future<void> _uploadPending() async {
     if (uploading) return;

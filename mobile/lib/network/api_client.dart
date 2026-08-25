@@ -21,7 +21,9 @@ class ApiClient {
     if (kDebugMode) {
       this.dio.interceptors.add(
         LogInterceptor(
+          requestHeader: false,
           requestBody: false,
+          responseHeader: false,
           responseBody: false,
           logPrint: (message) => debugPrint('[API] $message'),
         ),

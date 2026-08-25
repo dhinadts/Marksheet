@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'image_quality.dart';
 import 'offline_capture_queue.dart';
@@ -208,8 +209,15 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
               ? 'The image was verified by the server and is ready for processing.'
               : 'The durable local copy remains safely queued on this device.',
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Next student'),
+          ),
+        ],
       ),
     );
+    if (mounted) context.pop('captured');
   }
 
   @override

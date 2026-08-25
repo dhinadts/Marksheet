@@ -23,6 +23,8 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
     ('subject-offerings', 'Subject offering'),
   ];
   final selected = <String, CatalogItem>{};
+  final completedStudentIds = <String>{};
+  bool batchActive = false;
   int index = 0;
   late Future<List<CatalogItem>> items;
   @override
@@ -59,12 +61,40 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
           .toList();
     }
     final parent = parentFields[index];
-    return parent == null
+    final filtered = parent == null
         ? rows
         : rows
               .where((item) => item.raw[parent.$1] == selected[parent.$2]?.id)
               .toList();
+    if (index == 6 && batchActive) {
+      return filtered
+          .where((item) => !completedStudentIds.contains(item.id))
+          .toList();
+    }
+    return filtered;
   }
+
+  Future<void> _openCapture() async {
+    final paper = selected['Question paper']!;
+    final contextIds = selected.map((key, value) => MapEntry(key, value.id));
+    contextIds['_studentLabel'] = selected['Student']?.label ?? 'Student';
+    contextIds['_subjectLabel'] = selected['Subject']?.label ?? 'Subject';
+    contextIds['_paperLabel'] = paper.label;
+    contextIds['markingSchemeVersionId'] =
+        paper.raw['markingSchemeVersionId'] as String;
+    final studentId = selected['Student']!.id;
+    final result = await context.push<String>('/capture', extra: contextIds);
+    if (!mounted || result != 'captured') return;
+    setState(() {
+      completedStudentIds.add(studentId);
+      batchActive = true;
+      index = 6;
+      selected.remove('Student');
+      items = _load();
+    });
+  }
+
+  void _completeSubject() => context.go('/');
 
   void _previousStep() {
     if (index == 0) {
@@ -109,6 +139,13 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
               : steps[index].$2;
           final rows = snapshot.data!;
           if (rows.isEmpty) {
+            if (batchActive && index == 6) {
+              return _BatchComplete(
+                subject: selected['Subject']?.label ?? 'subject',
+                count: completedStudentIds.length,
+                onComplete: _completeSubject,
+              );
+            }
             return _Message(
               icon: Icons.inbox_outlined,
               text: 'No active $label records are available.',
@@ -130,6 +167,20 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
                   ),
                 ),
               ),
+              if (batchActive && index == 6)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _completeSubject,
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: Text(
+                        'Completed ${selected['Subject']?.label ?? 'subject'}',
+                      ),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: ListView.separated(
                   itemCount: rows.length,
@@ -138,20 +189,14 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
                     title: Text(rows[i].label),
                     subtitle: Text(rows[i].raw['code']?.toString() ?? ''),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
+                    onTap: () async {
                       selected[label] = rows[i];
+                      if (batchActive && index == 6) {
+                        await _openCapture();
+                        return;
+                      }
                       if (index == steps.length) {
-                        final contextIds = selected.map(
-                          (key, value) => MapEntry(key, value.id),
-                        );
-                        contextIds['_studentLabel'] =
-                            selected['Student']?.label ?? 'Student';
-                        contextIds['_subjectLabel'] =
-                            selected['Subject']?.label ?? 'Subject';
-                        contextIds['_paperLabel'] = rows[i].label;
-                        contextIds['markingSchemeVersionId'] =
-                            rows[i].raw['markingSchemeVersionId'] as String;
-                        context.push('/capture', extra: contextIds);
+                        await _openCapture();
                       } else {
                         setState(() {
                           index++;
@@ -165,6 +210,38 @@ class _SelectionScreenState extends ConsumerState<SelectionScreen> {
             ],
           );
         },
+      ),
+    ),
+  );
+}
+
+class _BatchComplete extends StatelessWidget {
+  const _BatchComplete({
+    required this.subject,
+    required this.count,
+    required this.onComplete,
+  });
+  final String subject;
+  final int count;
+  final VoidCallback onComplete;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.task_alt, size: 56, color: Colors.green),
+          const SizedBox(height: 12),
+          Text('$count student mark sheets captured'),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: onComplete,
+            icon: const Icon(Icons.check),
+            label: Text('Completed $subject'),
+          ),
+        ],
       ),
     ),
   );
