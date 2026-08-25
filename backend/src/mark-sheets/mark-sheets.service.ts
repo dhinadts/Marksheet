@@ -185,8 +185,8 @@ export class MarkSheetsService {
       const result = (await response.json()) as {
         marks: Array<{
           marking_scheme_item_id: string;
-          raw_text?: string;
-          value?: number;
+          raw_text?: string | null;
+          value?: number | null;
           confidence: number;
           status: string;
           bounding_box: Record<string, unknown>;
@@ -199,8 +199,8 @@ export class MarkSheetsService {
           aiModelVersionId: context.model.id,
           marks: result.marks.map((mark) => ({
             markingSchemeItemId: mark.marking_scheme_item_id,
-            rawText: mark.raw_text,
-            value: mark.value,
+            rawText: mark.raw_text ?? undefined,
+            value: mark.value ?? undefined,
             confidence: mark.confidence,
             status: mark.status as never,
             boundingBox: mark.bounding_box,
