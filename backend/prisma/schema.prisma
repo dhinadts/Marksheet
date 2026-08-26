@@ -771,6 +771,8 @@ model MarkSheet {
   status                 MarkSheetStatus       @default(PENDING_UPLOAD)
   clientRequestId        String                @map("client_request_id") @db.Uuid
   handwrittenTotal       Decimal?              @map("handwritten_total") @db.Decimal(7, 2)
+  columnsBeforeExtraction Json?                 @map("columns_before_extraction") @db.JsonB
+  columnsAfterExtraction  Json?                 @map("columns_after_extraction") @db.JsonB
   lockVersion            Int                   @default(0) @map("lock_version")
   createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)

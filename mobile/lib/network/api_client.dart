@@ -33,7 +33,7 @@ class ApiClient {
   final TokenStore _tokens;
   final Dio dio;
   final void Function()? onSessionExpired;
-  bool _refreshing = false;
+  Future<AuthTokens>? _refreshFuture;
   Future<void> _authorize(
     RequestOptions options,
     RequestInterceptorHandler handler,
@@ -51,20 +51,13 @@ class ApiClient {
   ) async {
     if (error.response?.statusCode != 401 ||
         error.requestOptions.extra['retried'] == true ||
-        _refreshing) {
+        error.requestOptions.path == '/auth/refresh') {
       return handler.next(error);
     }
     final tokens = await _tokens.read();
     if (tokens == null) return handler.next(error);
-    _refreshing = true;
     try {
-      final response = await Dio(BaseOptions(baseUrl: dio.options.baseUrl))
-          .post<Map<String, dynamic>>(
-            '/auth/refresh',
-            data: {'refreshToken': tokens.refreshToken},
-          );
-      final rotated = AuthTokens.fromJson(response.data!);
-      await _tokens.write(rotated);
+      final rotated = await (_refreshFuture ??= _rotate(tokens));
       final request = error.requestOptions..extra['retried'] = true;
       request.headers['Authorization'] = 'Bearer ${rotated.accessToken}';
       handler.resolve(await dio.fetch<dynamic>(request));
@@ -73,7 +66,18 @@ class ApiClient {
       onSessionExpired?.call();
       handler.next(error);
     } finally {
-      _refreshing = false;
+      _refreshFuture = null;
     }
+  }
+
+  Future<AuthTokens> _rotate(AuthTokens tokens) async {
+    final response = await Dio(BaseOptions(baseUrl: dio.options.baseUrl))
+        .post<Map<String, dynamic>>(
+          '/auth/refresh',
+          data: {'refreshToken': tokens.refreshToken},
+        );
+    final rotated = AuthTokens.fromJson(response.data!);
+    await _tokens.write(rotated);
+    return rotated;
   }
 }

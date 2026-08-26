@@ -174,10 +174,10 @@ class PipelineService:
         # at best reach REVIEW_RECOMMENDED -- a human always reviews cloud-sourced
         # marks before they count toward a grade.
         capped_confidence = max(0.0, thresholds.auto_accept - 1e-6)
-        results_by_label = {result.label: result for result in page_results}
+        results_by_item_id = {result.marking_scheme_item_id: result for result in page_results}
         marks: list[ExtractedMarkResult] = []
         for cell in cells:
-            result = results_by_label.get(cell.label)
+            result = results_by_item_id.get(cell.marking_scheme_item_id)
             value = result.value if result is not None else None
             confidence = capped_confidence if value is not None else 0.0
             status, reason = classify_extraction(value, cell.maximum_mark, confidence, thresholds)

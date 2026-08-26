@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   apiRequest,
+  hasStoredSession,
   login,
   type CurrentUser,
   type DepartmentStudents,
@@ -15,7 +16,7 @@ export default function Home() {
   const [showPassword, setShowPassword] = useState(false);
   const [markSheetId, setMarkSheetId] = useState("");
   const [error, setError] = useState("");
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(hasStoredSession);
   const [me, setMe] = useState<CurrentUser | null>(null);
   const [roster, setRoster] = useState<DepartmentStudents | null>(null);
   const [dashboardError, setDashboardError] = useState("");

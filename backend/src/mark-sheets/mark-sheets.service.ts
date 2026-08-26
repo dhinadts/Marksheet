@@ -111,7 +111,19 @@ export class MarkSheetsService {
       });
       await tx.markSheet.update({
         where: { id },
-        data: { status: MarkSheetStatus.PROCESSING },
+        data: {
+          status: MarkSheetStatus.PROCESSING,
+          columnsBeforeExtraction: items.map(({ cell, item }) => ({
+            markingSchemeItemId: item.id,
+            questionId: item.questionId,
+            questionPartId: item.questionPartId,
+            columnName: item.questionPart
+              ? `${item.question!.code}.${item.questionPart.code}`
+              : item.question!.code,
+            maximumMark: item.maximumMark.toString(),
+            extractedValue: null,
+          })) as Prisma.InputJsonArray,
+        },
       });
       return { sheet, image, template, model, items };
     });
@@ -236,7 +248,11 @@ export class MarkSheetsService {
         where: { id, tenantId: actor.tenantId },
         include: {
           images: true,
-          markingSchemeVersion: { include: { items: true } },
+          markingSchemeVersion: {
+            include: {
+              items: { include: { question: true, questionPart: true } },
+            },
+          },
         },
       });
       if (!sheet) throw new NotFoundException();
@@ -338,7 +354,25 @@ export class MarkSheetsService {
       });
       await tx.markSheet.update({
         where: { id },
-        data: { status: MarkSheetStatus.REVIEW_REQUIRED },
+        data: {
+          status: MarkSheetStatus.REVIEW_REQUIRED,
+          columnsAfterExtraction: scorable.map((item) => {
+            const mark = supplied.get(item.id);
+            return {
+              markingSchemeItemId: item.id,
+              questionId: item.questionId,
+              questionPartId: item.questionPartId,
+              columnName: item.questionPart
+                ? `${item.question!.code}.${item.questionPart.code}`
+                : item.question!.code,
+              maximumMark: item.maximumMark.toString(),
+              rawText: mark?.rawText ?? null,
+              extractedValue: mark?.value ?? null,
+              confidence: mark?.confidence ?? null,
+              extractionStatus: mark?.status ?? 'MANUAL_ENTRY_REQUIRED',
+            };
+          }) as Prisma.InputJsonArray,
+        },
       });
       await this.audit.record(
         tx,

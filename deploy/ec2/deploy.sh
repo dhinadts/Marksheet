@@ -68,6 +68,20 @@ if [[ -z "$cors_origins" || "$cors_origins" == "http://localhost:3000" ]]; then
   echo "Updated and saved CORS_ORIGINS for the production web application."
 fi
 
+# NEXT_PUBLIC_API_URL is compiled into the browser bundle. A localhost value
+# makes every production browser call its own machine instead of this API.
+public_api_url=$(grep '^NEXT_PUBLIC_API_URL=' .env | tail -n 1 | cut -d= -f2- || true)
+if [[ -z "$public_api_url" || "$public_api_url" =~ ^http://(localhost|127\.0\.0\.1)(:|/|$) ]]; then
+  public_api_url="https://api.dhinadts.com"
+  if grep -q '^NEXT_PUBLIC_API_URL=' .env; then
+    sed -i -E "s|^NEXT_PUBLIC_API_URL=.*$|NEXT_PUBLIC_API_URL=${public_api_url}|" .env
+  else
+    printf '\nNEXT_PUBLIC_API_URL=%s\n' "$public_api_url" >> .env
+  fi
+  export NEXT_PUBLIC_API_URL="$public_api_url"
+  echo "Updated and saved NEXT_PUBLIC_API_URL for production browsers."
+fi
+
 database_url=$(grep '^DATABASE_URL=' .env | cut -d= -f2- || true)
 if [[ -z "$database_url" ]]; then
   echo "DATABASE_URL is missing from .env." >&2

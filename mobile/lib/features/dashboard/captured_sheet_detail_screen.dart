@@ -25,11 +25,15 @@ class _DetailState extends ConsumerState<CapturedSheetDetailScreen> {
 
   Future<MarkSheetDetail> _load() =>
       ref.read(markSheetRepositoryProvider).detail(widget.markSheetId);
-  void _refresh() {
-    if (mounted) {
-      setState(() {
-        detail = _load();
-      });
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    final refreshed = _load();
+    setState(() => detail = refreshed);
+    try {
+      final sheet = await refreshed;
+      if (sheet.marks.isNotEmpty) timer?.cancel();
+    } catch (_) {
+      // Keep polling while processing or during a transient network failure.
     }
   }
 

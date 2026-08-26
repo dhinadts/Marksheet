@@ -4,6 +4,7 @@ import base64
 import json
 from dataclasses import dataclass
 from typing import Protocol
+from uuid import UUID
 
 from pydantic import ValidationError
 
@@ -14,6 +15,7 @@ from app.schemas.common import StrictModel, TemplateCell
 
 @dataclass(frozen=True, slots=True)
 class PageMarkResult:
+    marking_scheme_item_id: UUID
     label: str
     raw_text: str | None
     value: float | None
@@ -24,6 +26,7 @@ class PageRecognition(Protocol):
 
 
 class _OpenAiMark(StrictModel):
+    marking_scheme_item_id: UUID
     label: str
     obtained_mark: float | None = None
 
@@ -42,13 +45,17 @@ _SYSTEM_PROMPT = (
 
 
 def _build_user_prompt(cells: list[TemplateCell]) -> str:
-    expected = "\n".join(f"- {cell.label}: maximum mark {cell.maximum_mark}" for cell in cells)
+    expected = "\n".join(
+        f"- id={cell.marking_scheme_item_id}; label={cell.label}; maximum_mark={cell.maximum_mark}"
+        for cell in cells
+    )
     return (
         "Report the handwritten obtained mark for each of these questions, using "
         "exactly these labels:\n"
         f"{expected}\n\n"
-        'Respond with JSON only, shaped as: {"marks": [{"label": "Q1", "obtained_mark": 4}]}. '
-        "Include every requested label exactly once."
+        'Respond with JSON only, shaped as: {"marks": [{"marking_scheme_item_id": '
+        '"UUID", "label": "Q1", "obtained_mark": 4}]}. Include every requested ID '
+        "and label exactly once. Copy IDs and labels verbatim."
     )
 
 
@@ -93,6 +100,16 @@ class OpenAiPageRecognizer:
             if content is None:
                 raise ValueError("OpenAI response contained no message content")
             parsed = _OpenAiMarksResponse.model_validate(json.loads(content))
+            expected = {
+                cell.marking_scheme_item_id: cell.label for cell in cells
+            }
+            returned = {
+                mark.marking_scheme_item_id: mark.label for mark in parsed.marks
+            }
+            if len(returned) != len(parsed.marks) or returned != expected:
+                raise ValueError(
+                    "OpenAI response did not preserve every marking-scheme item ID and label"
+                )
         except (ValidationError, json.JSONDecodeError, ValueError, IndexError) as error:
             raise ServiceError(
                 502, "OPENAI_REQUEST_FAILED", "OpenAI vision response was empty or malformed"
@@ -111,6 +128,7 @@ class OpenAiPageRecognizer:
             ) from error
         return [
             PageMarkResult(
+                marking_scheme_item_id=mark.marking_scheme_item_id,
                 label=mark.label,
                 raw_text=None if mark.obtained_mark is None else str(mark.obtained_mark),
                 value=mark.obtained_mark,

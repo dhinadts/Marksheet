@@ -70,8 +70,16 @@ def test_recognize_page_maps_labels_to_results() -> None:
         json.dumps(
             {
                 "marks": [
-                    {"label": "Q1", "obtained_mark": 4},
-                    {"label": "Q2", "obtained_mark": None},
+                    {
+                        "marking_scheme_item_id": str(cells()[0].marking_scheme_item_id),
+                        "label": "Q1",
+                        "obtained_mark": 4,
+                    },
+                    {
+                        "marking_scheme_item_id": str(cells()[1].marking_scheme_item_id),
+                        "label": "Q2",
+                        "obtained_mark": None,
+                    },
                 ]
             }
         )
@@ -80,14 +88,42 @@ def test_recognize_page_maps_labels_to_results() -> None:
     results = recognizer.recognize_page(b"fake-png-bytes", cells())
 
     assert results == [
-        PageMarkResult(label="Q1", raw_text="4.0", value=4.0),
-        PageMarkResult(label="Q2", raw_text=None, value=None),
+        PageMarkResult(
+            marking_scheme_item_id=cells()[0].marking_scheme_item_id,
+            label="Q1", raw_text="4.0", value=4.0
+        ),
+        PageMarkResult(
+            marking_scheme_item_id=cells()[1].marking_scheme_item_id,
+            label="Q2", raw_text=None, value=None
+        ),
     ]
 
 
 def test_malformed_response_raises_request_failed() -> None:
     recognizer = OpenAiPageRecognizer(Settings(openai_api_key="sk-test-key"))
     recognizer._client.chat.completions.create = _fake_create("not json")  # type: ignore[method-assign]
+
+    with pytest.raises(ServiceError) as raised:
+        recognizer.recognize_page(b"fake-png-bytes", cells())
+
+    assert raised.value.code == "OPENAI_REQUEST_FAILED"
+
+
+def test_response_must_preserve_exact_item_ids() -> None:
+    recognizer = OpenAiPageRecognizer(Settings(openai_api_key="sk-test-key"))
+    recognizer._client.chat.completions.create = _fake_create(  # type: ignore[method-assign]
+        json.dumps(
+            {
+                "marks": [
+                    {
+                        "marking_scheme_item_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                        "label": "Q1",
+                        "obtained_mark": 4,
+                    }
+                ]
+            }
+        )
+    )
 
     with pytest.raises(ServiceError) as raised:
         recognizer.recognize_page(b"fake-png-bytes", cells())

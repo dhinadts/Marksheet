@@ -174,7 +174,14 @@ def _build_request_and_source(
 def test_extract_marks_maps_openai_results_to_marking_scheme_items() -> None:
     request, source = _build_request_and_source()
     page_recognizer = FakePageRecognizer(
-        [PageMarkResult(label="Q1", raw_text="4.0", value=4.0)]
+        [
+            PageMarkResult(
+                marking_scheme_item_id=request.template.cells[0].marking_scheme_item_id,
+                label="Q1",
+                raw_text="4.0",
+                value=4.0,
+            )
+        ]
     )
     service = PipelineService(
         Settings(max_image_bytes=10_000_000, recognizer_backend="openai_vision"),
