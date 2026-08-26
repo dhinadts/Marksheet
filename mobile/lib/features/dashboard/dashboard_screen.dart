@@ -61,7 +61,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     captures = _load();
   });
 
-  Future<void> _uploadPending({bool silent = false}) async {
+  Future<void> _uploadPending({
+    bool silent = false,
+    QueuedCapture? target,
+  }) async {
     if (uploading || !mounted) return;
     // Claim the upload loop before any asynchronous work. App resume, the
     // connectivity listener and the first-frame callback can otherwise all
@@ -71,7 +74,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     var completed = 0;
     Object? lastError;
     try {
-      pending = await queue.read();
+      final current = await queue.read();
+      pending = target == null
+          ? current
+          : current.where((entry) => entry.id == target.id).toList();
       if (pending.isEmpty || !await queue.isOnline) return;
       for (final entry in pending) {
         try {
@@ -206,6 +212,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                         : () => _uploadPending(),
                   ),
                 ),
+                if (pending.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ...pending.map(
+                    (entry) => Card(
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.description_outlined),
+                        ),
+                        title: Text(
+                          entry.context['_studentLabel'] ??
+                              entry.context['Student label'] ??
+                              'Queued mark sheet',
+                        ),
+                        subtitle: Text(
+                          '${entry.context['_subjectLabel'] ?? entry.context['Subject label'] ?? 'Subject'}\n'
+                          'Queued ${entry.createdAt.toLocal()} • Tap to convert',
+                        ),
+                        isThreeLine: true,
+                        trailing: const Icon(Icons.play_arrow),
+                        onTap: uploading
+                            ? null
+                            : () => _uploadPending(target: entry),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Card(
                   child: ListTile(

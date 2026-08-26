@@ -113,7 +113,7 @@ export class MarkSheetsService {
         where: { id },
         data: {
           status: MarkSheetStatus.PROCESSING,
-          columnsBeforeExtraction: items.map(({ cell, item }) => ({
+          columnsBeforeExtraction: items.map(({ item }) => ({
             markingSchemeItemId: item.id,
             questionId: item.questionId,
             questionPartId: item.questionPartId,
@@ -122,7 +122,7 @@ export class MarkSheetsService {
               : item.question!.code,
             maximumMark: item.maximumMark.toString(),
             extractedValue: null,
-          })) as Prisma.InputJsonArray,
+          })),
         },
       });
       return { sheet, image, template, model, items };
@@ -226,19 +226,57 @@ export class MarkSheetsService {
       );
       return { markSheetId: id, status: MarkSheetStatus.REVIEW_REQUIRED };
     } catch (error) {
-      await this.tenant.transaction(this.prisma, (tx) =>
-        tx.markSheet.updateMany({
-          where: {
-            id,
-            tenantId: actor.tenantId,
-            status: MarkSheetStatus.PROCESSING,
+      const reason =
+        error instanceof Error ? error.message : 'unknown AI error';
+      try {
+        // OCR is advisory. A provider outage or unreadable page must not leave
+        // the capture in a device queue indefinitely. Persist one immutable,
+        // empty extraction row per configured question so faculty can enter the
+        // exact handwritten values from the stored image.
+        await this.ingest(
+          id,
+          {
+            sourceImageId: context.image.id,
+            aiModelVersionId: context.model.id,
+            marks: [],
           },
-          data: { status: MarkSheetStatus.UPLOADED },
-        }),
-      );
-      throw new ServiceUnavailableException(
-        `Numeric mark extraction failed: ${error instanceof Error ? error.message : 'unknown AI error'}`,
-      );
+          actor,
+        );
+        await this.tenant.transaction(this.prisma, (tx) =>
+          this.audit.record(
+            tx,
+            actor,
+            'AI_EXTRACTION_FALLBACK_CREATED',
+            'markSheet',
+            id,
+            { status: MarkSheetStatus.PROCESSING },
+            {
+              status: MarkSheetStatus.REVIEW_REQUIRED,
+              extractionStatus: 'MANUAL_ENTRY_REQUIRED',
+            },
+            reason.slice(0, 500),
+          ),
+        );
+        return {
+          markSheetId: id,
+          status: MarkSheetStatus.REVIEW_REQUIRED,
+          extractionStatus: 'MANUAL_ENTRY_REQUIRED',
+        };
+      } catch (fallbackError) {
+        await this.tenant.transaction(this.prisma, (tx) =>
+          tx.markSheet.updateMany({
+            where: {
+              id,
+              tenantId: actor.tenantId,
+              status: MarkSheetStatus.PROCESSING,
+            },
+            data: { status: MarkSheetStatus.UPLOADED },
+          }),
+        );
+        throw new ServiceUnavailableException(
+          `Numeric mark extraction and manual-review fallback failed: ${fallbackError instanceof Error ? fallbackError.message : reason}`,
+        );
+      }
     }
   }
 
@@ -371,7 +409,7 @@ export class MarkSheetsService {
               confidence: mark?.confidence ?? null,
               extractionStatus: mark?.status ?? 'MANUAL_ENTRY_REQUIRED',
             };
-          }) as Prisma.InputJsonArray,
+          }),
         },
       });
       await this.audit.record(

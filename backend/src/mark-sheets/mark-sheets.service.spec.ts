@@ -18,6 +18,116 @@ describe('MarkSheetsService', () => {
     tokenVersion: 1,
   };
 
+  afterEach(() => jest.restoreAllMocks());
+
+  it('creates systemized manual-review entries when OCR is unavailable', async () => {
+    const item = {
+      id: 'item-id',
+      questionId: 'question-id',
+      questionPartId: null,
+      isScorable: true,
+      maximumMark: new Prisma.Decimal(2),
+      question: { code: 'Q1' },
+      questionPart: null,
+    };
+    const tx = {
+      markSheet: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'sheet-id',
+          status: 'UPLOADED',
+          questionPaperVersionId: 'paper-id',
+          markingSchemeVersionId: 'scheme-id',
+          images: [
+            {
+              id: 'image-id',
+              fileObject: {
+                bucket: 'private-bucket',
+                objectKey: `${actor.tenantId}/sheet.jpg`,
+                mimeType: 'image/jpeg',
+                sizeBytes: 1024n,
+                checksumSha256: 'a'.repeat(64),
+              },
+            },
+          ],
+          questionPaperVersion: {
+            version: 1,
+            imageTemplate: {
+              expectedAspectRatio: 0.7,
+              aspectRatioTolerance: 0.2,
+              cells: [{ questionCode: 'Q1', box: { x: 0.1 } }],
+            },
+          },
+          markingSchemeVersion: {
+            confidenceThresholds: {
+              autoAccept: 0.95,
+              reviewRecommended: 0.8,
+              reviewRequired: 0.6,
+            },
+            items: [item],
+          },
+        }),
+        update: jest.fn(),
+      },
+      extractedMark: { count: jest.fn().mockResolvedValue(0) },
+      aiModelVersion: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'model-id' }),
+      },
+    };
+    const tenant = {
+      transaction: jest.fn((_prisma, callback) => callback(tx)),
+    };
+    const audit = { record: jest.fn() };
+    const config = {
+      get: jest.fn().mockReturnValue('http://ai-service:8000'),
+      getOrThrow: jest.fn().mockReturnValue('internal-key'),
+    };
+    const service = new MarkSheetsService(
+      {} as never,
+      tenant as never,
+      audit as never,
+      {} as never,
+      config as never,
+    );
+    const ingest = jest
+      .spyOn(service, 'ingest')
+      .mockResolvedValue({ markSheetId: 'sheet-id' } as never);
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: () => Promise.resolve('quota unavailable'),
+    } as Response);
+
+    await expect(
+      service.processUploaded('sheet-id', actor, {
+        markSheetId: 'sheet-id',
+        status: 'UPLOADED' as never,
+      }),
+    ).resolves.toEqual({
+      markSheetId: 'sheet-id',
+      status: 'REVIEW_REQUIRED',
+      extractionStatus: 'MANUAL_ENTRY_REQUIRED',
+    });
+    expect(ingest).toHaveBeenCalledWith(
+      'sheet-id',
+      expect.objectContaining({
+        sourceImageId: 'image-id',
+        aiModelVersionId: 'model-id',
+        marks: [],
+      }),
+      actor,
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      tx,
+      actor,
+      'AI_EXTRACTION_FALLBACK_CREATED',
+      'markSheet',
+      'sheet-id',
+      expect.anything(),
+      expect.objectContaining({ extractionStatus: 'MANUAL_ENTRY_REQUIRED' }),
+      expect.stringContaining('503'),
+    );
+  });
+
   it('appends a reviewer value and never overwrites the AI value', async () => {
     const tx = {
       verificationSession: {
