@@ -186,7 +186,7 @@ async function seedDevelopmentUser(
     where: { tenantId_code: { tenantId: ids.tenant, code: 'VALUATOR' } },
   });
   const passwordHash = await argon2.hash('Qwerty@123', { type: argon2.argon2id });
-  for (let index = 1; index <= 10; index += 1) {
+  for (let index = 1; index <= 5; index += 1) {
     const username = `prof${index.toString().padStart(2, '0')}`;
     const user = await tx.user.upsert({
       where: { username },
@@ -426,12 +426,70 @@ async function seedAcademicStructure(
   }
 }
 
+async function seedRollStudents(tx: Prisma.TransactionClient): Promise<void> {
+  for (let index = 1; index <= 20; index += 1) {
+    const registerNumber = `ROLL${index.toString().padStart(2, '0')}`;
+    await tx.student.upsert({
+      where: {
+        tenantId_registerNumber: { tenantId: ids.tenant, registerNumber },
+      },
+      update: {
+        fullName: `Student ${index.toString().padStart(2, '0')}`,
+        firstName: 'Student',
+        lastName: index.toString().padStart(2, '0'),
+      },
+      create: {
+        id: uuid(0x700, index),
+        tenantId: ids.tenant,
+        departmentId: ids.department,
+        programId: ids.program,
+        sectionId: ids.section,
+        registerNumber,
+        fullName: `Student ${index.toString().padStart(2, '0')}`,
+        firstName: 'Student',
+        lastName: index.toString().padStart(2, '0'),
+      },
+    });
+  }
+}
+
 async function seedQuestionPaper(tx: Prisma.TransactionClient): Promise<void> {
+  const imageTemplate = {
+    expectedAspectRatio: 0.751,
+    aspectRatioTolerance: 0.25,
+    cells: [
+      ...Array.from({ length: 10 }, (_, index) => ({
+        questionCode: `Q${index + 1}`,
+        box: {
+          x: 0.205,
+          y: 0.575 + index * 0.0235,
+          width: 0.075,
+          height: 0.027,
+        },
+      })),
+      ...Array.from({ length: 6 }, (_, index) =>
+        ['a', 'b'].map((questionPartCode, partIndex) => ({
+          questionCode: `Q${index + 11}`,
+          questionPartCode,
+          box: {
+            x: 0.415,
+            y: 0.575 + (index * 2 + partIndex) * 0.0235,
+            width: 0.16,
+            height: 0.027,
+          },
+        })),
+      ).flat(),
+    ],
+  } satisfies Prisma.InputJsonObject;
   const existingPublishedVersion = await tx.questionPaperVersion.findUnique({
     where: { id: ids.questionPaperVersion },
     select: { status: true },
   });
   if (existingPublishedVersion?.status === VersionStatus.PUBLISHED) {
+    await tx.questionPaperVersion.update({
+      where: { id: ids.questionPaperVersion },
+      data: { imageTemplate },
+    });
     return;
   }
 
@@ -465,13 +523,14 @@ async function seedQuestionPaper(tx: Prisma.TransactionClient): Promise<void> {
         version: 1,
       },
     },
-    update: {},
+    update: { imageTemplate },
     create: {
       id: ids.questionPaperVersion,
       tenantId: ids.tenant,
       questionPaperId: ids.questionPaper,
       version: 1,
       status: VersionStatus.DRAFT,
+      imageTemplate,
     },
   });
   await tx.markingSchemeVersion.upsert({
@@ -506,7 +565,10 @@ async function seedQuestionPaper(tx: Prisma.TransactionClient): Promise<void> {
         version: 1,
       },
     },
-    update: { markingSchemeVersionId: ids.markingSchemeVersion },
+    update: {
+      markingSchemeVersionId: ids.markingSchemeVersion,
+      imageTemplate,
+    },
     create: {
       id: ids.questionPaperVersion,
       tenantId: ids.tenant,
@@ -514,6 +576,7 @@ async function seedQuestionPaper(tx: Prisma.TransactionClient): Promise<void> {
       version: 1,
       status: VersionStatus.DRAFT,
       markingSchemeVersionId: ids.markingSchemeVersion,
+      imageTemplate,
     },
   });
 
@@ -609,7 +672,7 @@ async function seedQuestionPaper(tx: Prisma.TransactionClient): Promise<void> {
   });
   await tx.questionPaperVersion.update({
     where: { id: ids.questionPaperVersion },
-    data: { status: VersionStatus.PUBLISHED, publishedAt },
+    data: { status: VersionStatus.PUBLISHED, publishedAt, imageTemplate },
   });
 }
 
@@ -648,6 +711,7 @@ async function main(): Promise<void> {
     await seedAcademicStructure(tx);
     await seedAuthorization(tx);
     await seedDevelopmentUser(tx);
+    await seedRollStudents(tx);
     await seedQuestionPaper(tx);
   });
 }

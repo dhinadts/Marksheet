@@ -42,9 +42,20 @@ class UploadRepository {
     );
     final body = response.data!;
     if (body['alreadyCaptured'] == true) {
+      // The image may already be in object storage while a previous extraction
+      // attempt failed (for example, while the AI service was unavailable).
+      // Upload completion is idempotent and resumes extraction for that sheet.
+      final markSheetId = body['markSheetId'] as String;
+      final completed = await _dio.post<Map<String, dynamic>>(
+        '/mark-sheets/$markSheetId/upload-complete',
+        options: Options(receiveTimeout: const Duration(seconds: 135)),
+      );
       return UploadResult(
-        markSheetId: body['markSheetId'] as String,
-        status: body['status']?.toString() ?? 'UPLOADED',
+        markSheetId: markSheetId,
+        status:
+            completed.data?['status']?.toString() ??
+            body['status']?.toString() ??
+            'UPLOADED',
       );
     }
     final upload = body['upload'] as Map<String, dynamic>;
@@ -61,6 +72,10 @@ class UploadRepository {
     );
     final completed = await _dio.post<Map<String, dynamic>>(
       '/mark-sheets/${body['markSheetId']}/upload-complete',
+      // Upload completion also performs advisory OpenAI vision extraction.
+      // Keep this above the backend's 120-second AI timeout so a successful
+      // extraction is not mistaken for a failed offline-queue retry.
+      options: Options(receiveTimeout: const Duration(seconds: 135)),
     );
     return UploadResult(
       markSheetId: body['markSheetId'] as String,

@@ -50,6 +50,13 @@ def _fake_create(content: str | None):
     return create
 
 
+def _raise(error: Exception):
+    def create(**kwargs: object) -> _FakeResponse:
+        raise error
+
+    return create
+
+
 def test_missing_api_key_raises_not_configured() -> None:
     with pytest.raises(ServiceError) as raised:
         OpenAiPageRecognizer(Settings(openai_api_key=None))
@@ -96,3 +103,16 @@ def test_empty_response_raises_request_failed() -> None:
         recognizer.recognize_page(b"fake-png-bytes", cells())
 
     assert raised.value.code == "OPENAI_REQUEST_FAILED"
+
+
+def test_insufficient_quota_has_actionable_error() -> None:
+    recognizer = OpenAiPageRecognizer(Settings(openai_api_key="sk-test-key"))
+    quota_error = RuntimeError("429 insufficient_quota")
+    recognizer._client.chat.completions.create = _raise(quota_error)  # type: ignore[method-assign]
+
+    with pytest.raises(ServiceError) as raised:
+        recognizer.recognize_page(b"fake-png-bytes", cells())
+
+    assert raised.value.status_code == 503
+    assert raised.value.code == "OPENAI_QUOTA_EXCEEDED"
+    assert "billing credits" in raised.value.message

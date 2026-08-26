@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -68,6 +69,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     setState(() => uploading = true);
     var pending = <QueuedCapture>[];
     var completed = 0;
+    Object? lastError;
     try {
       pending = await queue.read();
       if (pending.isEmpty || !await queue.isOnline) return;
@@ -89,8 +91,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           final image = File(entry.imagePath);
           if (await image.exists()) await image.delete();
           completed++;
-        } catch (_) {
+        } catch (error) {
           // Keep failed entries safely queued for the next retry.
+          lastError = error;
         }
       }
     } finally {
@@ -104,7 +107,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             SnackBar(
               content: Text(
                 completed == 0
-                    ? 'Queued captures are still waiting for the server'
+                    ? 'Mark extraction failed; the capture remains safely queued. ${_uploadErrorMessage(lastError)}'
                     : '$completed capture${completed == 1 ? '' : 's'} moved to Captured mark sheets',
               ),
             ),
@@ -112,6 +115,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         }
       }
     }
+  }
+
+  String _uploadErrorMessage(Object? error) {
+    if (error is DioException) {
+      final data = error.response?.data;
+      if (data is Map && data['message'] != null) {
+        return data['message'].toString();
+      }
+      if (error.type == DioExceptionType.receiveTimeout) {
+        return 'The AI service took too long to respond. Tap to retry.';
+      }
+    }
+    return 'Tap to retry.';
   }
 
   @override
@@ -179,9 +195,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                             )
                           : const Icon(Icons.sync),
                     ),
-                    title: const Text('Offline queue'),
+                    title: const Text('Online extraction queue'),
                     subtitle: Text(
-                      '${pending.length} capture${pending.length == 1 ? '' : 's'} waiting to upload${pending.isEmpty ? '' : ' • Tap to retry'}',
+                      pending.isEmpty
+                          ? 'All captures have been sent for extraction'
+                          : '${pending.length} capture${pending.length == 1 ? '' : 's'} ready to upload and extract • Tap to start',
                     ),
                     onTap: pending.isEmpty || uploading
                         ? null

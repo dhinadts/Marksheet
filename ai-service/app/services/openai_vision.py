@@ -98,6 +98,14 @@ class OpenAiPageRecognizer:
                 502, "OPENAI_REQUEST_FAILED", "OpenAI vision response was empty or malformed"
             ) from error
         except Exception as error:
+            if getattr(error, "code", None) == "insufficient_quota" or "insufficient_quota" in str(
+                error
+            ):
+                raise ServiceError(
+                    503,
+                    "OPENAI_QUOTA_EXCEEDED",
+                    "OpenAI API quota is unavailable; add API billing credits and retry the queue",
+                ) from error
             raise ServiceError(
                 502, "OPENAI_REQUEST_FAILED", "OpenAI vision request failed"
             ) from error

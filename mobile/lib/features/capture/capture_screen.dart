@@ -202,12 +202,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen>
       context: context,
       builder: (_) => AlertDialog(
         title: Text(
-          uploaded ? 'Upload complete' : 'Capture added to device queue',
+          uploaded
+              ? 'Upload and extraction complete'
+              : 'Capture added to online queue',
         ),
         content: Text(
           uploaded
               ? 'The image was verified by the server and is ready for processing.'
-              : 'The durable local copy remains safely queued on this device.',
+              : 'The capture is ready to upload and extract when the server is available.',
         ),
         actions: [
           TextButton(
