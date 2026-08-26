@@ -5,6 +5,7 @@ RUN npm ci
 
 FROM node:20-alpine AS builder
 ARG NEXT_PUBLIC_API_URL
+RUN test -n "$NEXT_PUBLIC_API_URL" && test "$NEXT_PUBLIC_API_URL" != "http://localhost:3001"
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 # Cap the build heap so V8 garbage-collects earlier instead of growing past

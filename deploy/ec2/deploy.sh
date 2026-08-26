@@ -78,8 +78,14 @@ if [[ -z "$public_api_url" || "$public_api_url" =~ ^http://(localhost|127\.0\.0\
   else
     printf '\nNEXT_PUBLIC_API_URL=%s\n' "$public_api_url" >> .env
   fi
-  export NEXT_PUBLIC_API_URL="$public_api_url"
   echo "Updated and saved NEXT_PUBLIC_API_URL for production browsers."
+fi
+# Shell variables take precedence over Compose's .env file. Always overwrite a
+# stale value inherited by an SSH session before building the browser bundle.
+export NEXT_PUBLIC_API_URL="$public_api_url"
+if [[ "$NEXT_PUBLIC_API_URL" != https://api.dhinadts.com ]]; then
+  echo "NEXT_PUBLIC_API_URL must be https://api.dhinadts.com for this deployment." >&2
+  exit 1
 fi
 
 database_url=$(grep '^DATABASE_URL=' .env | cut -d= -f2- || true)
