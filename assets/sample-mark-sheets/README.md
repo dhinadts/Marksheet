@@ -27,3 +27,8 @@ Important constraints:
 Original filename: `MarkSheet.jpeg`
 
 SHA-256: `c71286cb5355f3791957ddb5da7b070c8729d59590de225ac089ea3865d81169`
+
+`MarkSheet-alternate-template.png` is a synthetic, fictional fixture with a
+deliberately different table structure. It is used to verify that unsupported
+layouts become structured manual-review entries without inventing OCR marks.
+It contains no real student or institution data.
